@@ -1,5 +1,8 @@
 # Links for researching/reference
 
+## Home Assistant Development
+- https://developers.home-assistant.io/
+
 ## Using Home Assistant and MQTT
 - https://www.home-assistant.io/docs/mqtt/discovery/
 - https://www.home-assistant.io/blog/2015/09/11/different-ways-to-use-mqtt-with-home-assistant/
