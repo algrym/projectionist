@@ -1,7 +1,6 @@
 #!/usr/bin/bash
 
 PRJ_PORT=/dev/ttyUSB0
-PRJ_PORT=/dev/stdout
 PRJ_PORT_BAUD=9600
 
 # Goofy Sh!t I've learned about the TK850:
@@ -61,4 +60,4 @@ case "$1" in
     exit 1
     ;;
 esac
-printf ${PRJ_CMD}'\n'
+printf ${PRJ_CMD}'\n' > ${PRJ_PORT}

@@ -1,10 +1,7 @@
 #!/usr/bin/python3
 
+# List of Raspbian pre-req packages
 # sudo apt install python3-serial python3-serial-asyncio python3-paho-mqtt python3-pexpect python3-yaml
-# Docs on using Home Assistant and MQTT
-# https://www.home-assistant.io/docs/mqtt/discovery/
-# https://www.home-assistant.io/blog/2015/09/11/different-ways-to-use-mqtt-with-home-assistant/
-# http://www.steves-internet-guide.com/receiving-messages-mqtt-python-client/
 
 ################################################################
 # Import standard Python libraries.
@@ -19,8 +16,6 @@ import paho.mqtt.client as mqtt
 import serial
 
 # Import the PyYAML library.
-#   https://datacrayon.com/posts/programming/python/yaml-for-configuration-files/
-#   https://towardsdatascience.com/from-novice-to-expert-how-to-write-a-configuration-file-in-python-273e171a8eb3
 import yaml
 
 ################################################################
