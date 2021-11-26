@@ -26,6 +26,10 @@ client = None
 config = None
 
 ################################################################
+# Initial Setup
+logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.DEBUG)
+
+################################################################
 # Load config from file
 #  TODO: Handle invalid YAML
 with open('config.yaml') as f:
@@ -88,7 +92,7 @@ def on_message(client, userdata, msg):
 # Launch the MQTT network client
 print ("- Setting up MQTT client")
 client = mqtt.Client(client_id=platform.node(), clean_session=True)
-client.enable_logger(logger=logging.DEBUG)
+client.enable_logger(logger=logging)
 
 client.on_connect = on_connect
 client.on_message = on_message
@@ -98,7 +102,7 @@ client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
 
 # Start a background thread to connect to the MQTT network.
 print ("- Starting background thread for MQTT connection")
-client.connect_async(config['mqtt_hostname'], config['mqtt_portnumber'])
+client.connect_async(config['mqtt_hostname'], port=config['mqtt_portnumber'], keepalive=config['mqtt_keepalive'])
 client.loop_start()
 
 # TOOD: check that all the above MQTT stuff was successful
