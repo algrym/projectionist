@@ -24,6 +24,7 @@ import yaml
 serial_port = None
 client = None
 config = None
+original_sigint_handler = None
 
 ################################################################
 # Initial Setup
@@ -40,20 +41,25 @@ pprint.pprint(config)
 
 ################################################################
 # Attach a handler to the keyboard interrupt (control-C).
-def _sigint_handler(signal, frame):
+def _sigint_handler(signalNumber, stackFrame):
     print("\n- Keyboard interrupt caught, closing down...")
+    signal.signal(signal.SIGINT, original_sigint_handler)
+
+    print("- Closing serial port ...", end = '')
     if serial_port is not None:
         serial_port.close()
-    print("- Serial port closed.")
+    print("done.")
 
+    print("- Closing MQTT client ...", end = '')
     if client is not None:
         client.loop_stop()
-    print("- MQTT client closed.")
+    print("done.")
 
     print("- Exiting.  You don't have to go home, but you can't stay here.")
     sys.exit(0)
 
 print("- SIGINT handler installed.")
+original_sigint_handler = signal.getsignal(signal.SIGINT)
 signal.signal(signal.SIGINT, _sigint_handler)
 
 ################################################################
@@ -100,7 +106,10 @@ client.enable_logger(logger=logging)
 client.on_connect = on_connect
 client.on_message = on_message
 
-client.tls_set()
+if config['mqtt_use_tls']:
+    print("- Enabling TLS for MQTT")
+    client.tls_set()
+
 client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
 
 # Start a background thread to connect to the MQTT network.
