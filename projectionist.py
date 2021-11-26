@@ -5,7 +5,7 @@
 
 ################################################################
 # Import standard Python libraries.
-import sys, time, signal, pprint
+import sys, time, signal, pprint, platform, logging
 
 # Import the MQTT client library.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -60,9 +60,7 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
-    # The hash mark is a multi-level wildcard, so this will
-    # subscribe to all subtopics of 16223
-    client.subscribe(config['mqtt_subscription'], qos=0)
+    client.subscribe(config['mqtt_subscription'])
     return
 
 #----------------------------------------------------------------
@@ -88,11 +86,13 @@ def on_message(client, userdata, msg):
 
 #----------------------------------------------------------------
 # Launch the MQTT network client
-print ("- Creating MQTT client")
-client = mqtt.Client()
-client.enable_logger()
+print ("- Setting up MQTT client")
+client = mqtt.Client(client_id=platform.node(), clean_session=True)
+client.enable_logger(logger=logging.DEBUG)
+
 client.on_connect = on_connect
 client.on_message = on_message
+
 client.tls_set()
 client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
 
