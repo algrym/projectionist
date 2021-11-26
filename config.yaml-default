@@ -1,0 +1,8 @@
+mqtt_hostname: broker.hivemq.com
+mqtt_portnumber: 1883
+mqtt_username: changeme
+mqtt_password: sorry_about_this
+mqtt_topic: TODO
+mqtt_subscription: '#'
+serial_port_name: /dev/ttyUSB0
+serial_port_baud: 9600
