@@ -44,10 +44,13 @@ def _sigint_handler(signal, frame):
     print("\n- Keyboard interrupt caught, closing down...")
     if serial_port is not None:
         serial_port.close()
+    print("- Serial port closed.")
 
     if client is not None:
         client.loop_stop()
+    print("- MQTT client closed.")
 
+    print("- Exiting.  You don't have to go home, but you can't stay here.")
     sys.exit(0)
 
 print("- SIGINT handler installed.")
@@ -64,7 +67,7 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
-    client.subscribe(config['mqtt_subscription'])
+    client.subscribe(config['mqtt_topic_prefix/#'])
     return
 
 #----------------------------------------------------------------

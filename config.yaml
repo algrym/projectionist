@@ -1,8 +1,8 @@
-mqtt_hostname: broker.hivemq.com
+mqtt_hostname: test.mosquitto.org
 mqtt_portnumber: 1883
-mqtt_username: changeme
-mqtt_password: sorry_about_this
-mqtt_topic: TODO
-mqtt_subscription: '#'
+mqtt_username: projuser
+mqtt_password: NOPENOPENOPE
+mqtt_topic_prefix: projectionist/hostname/tk850
+mqtt_keepalive: 120
 serial_port_name: /dev/ttyUSB0
 serial_port_baud: 9600
