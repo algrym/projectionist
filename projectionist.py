@@ -5,7 +5,7 @@
 
 ################################################################
 # Import standard Python libraries - we're assuming POSIX
-import sys, time, signal, platform, logging, argparse, pprint
+import sys, time, signal, platform, logging, argparse, queue, threading
 
 # Import the MQTT client library.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -21,10 +21,13 @@ import yaml
 ################################################################
 # Global script variables.
 
+# TODO: get this naming standard nonsense under control.
 serial_port = None
 client = None
 config = None
 original_sigint_handler = None
+publishQ = None
+serialQ = None
 
 ################################################################
 # Initial Setup
@@ -45,6 +48,10 @@ else:
 # TODO: log output needs to change when we start interfacing with systemd
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logLevel)
 
+# Initial setup of the inbound and outbound queues
+publishQ = queue.Queue()
+serialQ = queue.Queue()
+
 ################################################################
 # Load config from file
 #  TODO: Handle invalid YAML
@@ -52,6 +59,16 @@ with open(args.config_file) as f:
     config = yaml.safe_load(f)
 
 logging.info(f"Configuration loaded from '{args.config_file}': {config}")
+
+#----------------------------------------------------------------
+# Setup composite config elements
+# TODO: Check config to ensure necessary items exist and are in scope
+if config['mqtt']['topic']['node_id'] == 'HOSTNAME':
+    config['mqtt']['topic']['node_id'] = platform.node()
+
+# topic: <prefix>/[<node_id>/]<object_id>
+mqtt_topic = f"{config['mqtt']['topic']['prefix']}/{config['mqtt']['topic']['node_id']}/{ config['mqtt']['topic']['object_id']}"
+logging.debug(f"MQTT using topic: {mqtt_topic}")
 
 ################################################################
 # Attach a handler to the keyboard interrupt (control-C).
@@ -107,7 +124,7 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
-    client.subscribe(config['mqtt']['topicPrefix'] + "/#")
+    #client.subscribe(topic_prefix + "/#")
     # TODO: Use https://github.com/eclipse/paho.mqtt.python#message_callback_add
     return
 
@@ -152,13 +169,79 @@ def mqtt_publish(topic, payload, retain=False):
 #----------------------------------------------------------------
 # This faux-callback gets called when there's incoming serial input
 def parseSerialInput(input):
-    if input.startswith('*MODELNAME='):
-        logging.debug(f"serial: MODELNAME {input[11:-1]}")
-        mqtt_publish(topic=config['mqtt']['topicPrefix'] + "/modelname",
+    # Trim stuff from the beginning and end of the input
+    input.strip()
+
+    # Look for words we know, and ignore what we don't
+    if input.startswith('>'):
+        logging.debug(f"serial: echo {input}")
+
+    elif input.startswith('*MODELNAME='):
+        logging.debug(f"serial: found MODELNAME={input[11:-1]}")
+        mqtt_publish(topic=mqtt_topic + "/modelname",
             payload=input[11:-1], retain=True)
+
+    elif input.startswith('*LTIM='):
+        logging.debug(f"serial: found LTIM={input[6:-1]}")
+        mqtt_publish(topic=mqtt_topic + "/lamphour",
+            payload=input[6:-1], retain=True)
+
+    elif input.startswith('*POW='):
+        logging.debug(f"serial: found POW={input[5:-1]}")
+        mqtt_publish(topic=mqtt_topic + "/power",
+            payload=input[5:-1], retain=True)
+
+    elif input.startswith('*SOUR='):
+        logging.debug(f"serial: found SOUR={input[6:-1]}")
+        mqtt_publish(topic=mqtt_topic + "/source",
+            payload=input[6:-1], retain=True)
+
+    elif input.startswith('*BLANK='):
+        logging.debug(f"serial: found BLANK={input[7:-1]}")
+        mqtt_publish(topic=mqtt_topic + "/blank",
+            payload=input[7:-1], retain=True)
+
     else:
-        logging.debug(f"serial: {input}")
+        logging.debug(f"serial: unknown {input}")
     return
+
+#----------------------------------------------------------------
+# This faux-callback gets called when there's stuff to be sent
+def processQueues():
+    #logging.debug(f"processQueues publishQ.empty {publishQ.empty()} serialQ.empty {serialQ.empty()}")
+
+    # Process one item off each queue, then return
+    #  I think its best to do the serial queue first
+    if not serialQ.empty():
+        msg = serialQ.get()
+        try:
+            serial_port.write(msg)
+        except Exception as e:
+            logging.error('serial write error msg: (msg) error: e')
+            sys.exit(os.EX_IOERR)
+        serialQ.task_done()
+
+    if not publishQ.empty():
+        topic, msg, retain = publishQ.get()
+        mqtt_publish(topic=topic, payload=msg, retain=retain)
+        publishQ.task_done()
+
+    return
+
+#----------------------------------------------------------------
+# Worker thread to periodically push initial commands onto the serial queue
+def worker():
+    while True:
+        logging.info(f"worker awakens! Updating state information")
+        serialQ.put(b'\r*modelname=?#\r')
+        serialQ.put(b'\r*ltim=?#\r')
+        serialQ.put(b'\r*pow=?#\r')
+        serialQ.put(b'\r*sour=?#\r')
+        serialQ.put(b'\r*blank=?#\r')
+
+        logging.info(f"worker updates queued. Sleeping for {config['worker']['delay']} secs")
+        time.sleep(config['worker']['delay'])
+    return # Seems kinda silly, don't it?
 
 ################################################################
 # Launch the MQTT network client
@@ -200,8 +283,8 @@ serial_port = serial.Serial(config['serialPort']['name'], baudrate=config['seria
 # wait briefly for the system to complete waking up
 time.sleep(0.2)
 
-# Get initial information from the device
-serial_port.write(b'\r*modelname=?#\r')
+# Start thread to periodically push initial commands onto the serial queue
+threading.Thread(target=worker, daemon=True).start()
 
 # Start into the event loop
 logging.info(f"Entering event loop for {config['serialPort']['name']}.  SIGINT to quit.")
@@ -209,3 +292,6 @@ while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
         parseSerialInput(input)
+    processQueues()
+
+    #if not publishQ.empty() and not serialQ.empty():

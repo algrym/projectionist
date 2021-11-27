@@ -4,9 +4,14 @@ mqtt:
   portnumber: 1883
   username: projuser
   password: NOPENOPENOPE
-  topicPrefix: tk850
+  topic:
+    prefix: projectionist
+    node_id: HOSTNAME
+    object_id: tk850
   keepalive: 120
   useTLS: false
 serialPort:
   name: /dev/ttyUSB0
   baud: 9600
+worker:
+  delay: 300
