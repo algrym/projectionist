@@ -1,3 +1,4 @@
+---
 mqtt_hostname: test.mosquitto.org
 mqtt_portnumber: 1883
 mqtt_username: projuser
