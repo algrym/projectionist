@@ -8,6 +8,8 @@ mqtt:
     prefix: projectionist
     node_id: HOSTNAME
     object_id: tk850
+  discovery:
+    prefix: homeassistant
   keepalive: 120
   useTLS: false
 serialPort:

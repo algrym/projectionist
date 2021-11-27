@@ -84,6 +84,7 @@ def _sigint_handler(signalNumber, stackFrame):
     if client is not None:
         client.loop_stop()
         client.disconnect()
+    # TODO: Update mqtt availability topic on connect
 
     logging.info("Exiting.  You don't have to go home, but you can't stay here.")
     sys.exit(0)
@@ -124,8 +125,14 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
-    #client.subscribe(topic_prefix + "/#")
     # TODO: Use https://github.com/eclipse/paho.mqtt.python#message_callback_add
+
+    # Subscribe to the appropriate locations
+    client.subscribe(mqtt_topic + "/power/set")
+    client.subscribe(mqtt_topic + "/source/set")
+    client.subscribe(mqtt_topic + "/blank/set")
+
+    # TODO: Update mqtt availability topic on connect
     return
 
 #----------------------------------------------------------------
@@ -133,20 +140,17 @@ def on_connect(client, userdata, flags, rc):
 # client is subscribed.  The message variable is a MQTTMessage that describes
 # all of the message parameters.
 
+# TODO: MQTT request to command mapping should come from config.yaml
+
 # Some useful MQTTMessage fields: topic, payload, qos, retain, mid, properties.
 #   The payload is a binary string (bytes).
 #   qos is an integer quality of service indicator (0,1, or 2)
 #   mid is an integer message ID.
 def on_message(client, userdata, msg):
-    logging.debug(f"mqtt msg mid: {msg.mid} topic: {msg.topic} payload: {msg.payload}")
-
-    # If the serial port is ready, re-transmit received messages to the
-    # device. The msg.payload is a bytes object which can be directly sent to
-    # the serial port with an appended line ending.
-    #if serial_port is not None and serial_port.is_open:
-        # TODO: convert incoming MQTT request to appropriate projector commands
-        # TODO: MQTT requests to commands should come from config.yaml
-        #serial_port.write(msg.payload + b'\n')
+    if msg.topic.startswith(mqtt_topic):
+        msg_to_cmds(msg.topic.split('/')[3], msg.payload)
+    else:
+        logging.debug(f"mqtt msg unknown mid: {msg.mid} topic: {msg.topic} payload: {msg.payload}")
     return
 
 #----------------------------------------------------------------
@@ -175,6 +179,11 @@ def parseSerialInput(input):
     # Look for words we know, and ignore what we don't
     if input.startswith('>'):
         logging.debug(f"serial: echo {input}")
+
+    # Handle weird power-on state message
+    elif input == '0.33PUN':
+        logging.debug(f"serial: weird power-on state message {input}")
+        serialQ.put(b'\r*pow=?#\r')
 
     elif input.startswith('*MODELNAME='):
         logging.debug(f"serial: found MODELNAME={input[11:-1]}")
@@ -221,11 +230,37 @@ def processQueues():
             sys.exit(os.EX_IOERR)
         serialQ.task_done()
 
-    if not publishQ.empty():
+    if client.isConnected and not publishQ.empty():
         topic, msg, retain = publishQ.get()
         mqtt_publish(topic=topic, payload=msg, retain=retain)
         publishQ.task_done()
 
+    return
+
+#----------------------------------------------------------------
+# Convert messages into commands for the projector
+def msg_to_cmds(msg_command, msg_payload):
+    logging.debug(f"msg_to_cmds cmd: {msg_command} payload: {msg_payload}")
+    if msg_command == 'blank':
+        if msg_payload == b'ON':
+            serialQ.put(b'\r*blank=on#\r')
+        elif msg_payload == b'OFF':
+            serialQ.put(b'\r*blank=off#\r')
+        serialQ.put(b'\r*blank=?#\r')
+
+    elif msg_command == 'power':
+        if msg_payload == b'ON':
+            serialQ.put(b'\r*pow=on#\r')
+        elif msg_payload == b'OFF':
+            serialQ.put(b'\r*pow=off#\r')
+        serialQ.put(b'\r*pow=?#\r')
+
+    elif msg_command == 'source':
+        if msg_payload == b'hdmi1':
+            serialQ.put(b'\r*sour=hdmi#\r')
+        elif msg_payload == b'hdmi2':
+            serialQ.put(b'\r*sour=hdmi2#\r')
+        serialQ.put(b'\r*sour=?#\r')
     return
 
 #----------------------------------------------------------------
@@ -238,6 +273,8 @@ def worker():
         serialQ.put(b'\r*pow=?#\r')
         serialQ.put(b'\r*sour=?#\r')
         serialQ.put(b'\r*blank=?#\r')
+
+        # TODO: periodically send discovery config updates
 
         logging.info(f"worker updates queued. Sleeping for {config['worker']['delay']} secs")
         time.sleep(config['worker']['delay'])
@@ -267,11 +304,6 @@ client.isConnected=False
 client.connect_async(config['mqtt']['hostname'], port=config['mqtt']['portnumber'],
         keepalive=config['mqtt']['keepalive'])
 client.loop_start()
-
-# wait until all the above MQTT stuff was successful
-while not client.isConnected:
-    logging.debug("Sleeping for MQTT connection ...")
-    time.sleep(1)
 
 ################################################################
 # Connect to the serial device
