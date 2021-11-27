@@ -1,10 +1,12 @@
 ---
-mqtt_hostname: test.mosquitto.org
-mqtt_portnumber: 1883
-mqtt_username: projuser
-mqtt_password: NOPENOPENOPE
-mqtt_topic_prefix: projectionist/hostname/tk850
-mqtt_keepalive: 120
-mqtt_use_tls: false
-serial_port_name: /dev/ttyUSB0
-serial_port_baud: 9600
+mqtt:
+  hostname: test.mosquitto.org
+  portnumber: 1883
+  username: projuser
+  password: NOPENOPENOPE
+  topicPrefix: tk850
+  keepalive: 120
+  useTLS: false
+serialPort:
+  name: /dev/ttyUSB0
+  baud: 9600

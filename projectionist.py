@@ -5,7 +5,7 @@
 
 ################################################################
 # Import standard Python libraries - we're assuming POSIX
-import sys, time, signal, platform, logging, argparse
+import sys, time, signal, platform, logging, argparse, pprint
 
 # Import the MQTT client library.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -107,7 +107,7 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
-    client.subscribe(config['mqtt_topic_prefix'] + "/#")
+    client.subscribe(config['mqtt']['topicPrefix'] + "/#")
     # TODO: Use https://github.com/eclipse/paho.mqtt.python#message_callback_add
     return
 
@@ -154,7 +154,7 @@ def mqtt_publish(topic, payload, retain=False):
 def parseSerialInput(input):
     if input.startswith('*MODELNAME='):
         logging.debug(f"serial: MODELNAME {input[11:-1]}")
-        mqtt_publish(topic=config['mqtt_topic_prefix'] + "/modelname",
+        mqtt_publish(topic=config['mqtt']['topicPrefix'] + "/modelname",
             payload=input[11:-1], retain=True)
     else:
         logging.debug(f"serial: {input}")
@@ -171,18 +171,18 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.on_disconnect = on_disconnect
 
-if config['mqtt_use_tls']:
+if config['mqtt']['useTLS']:
     logging.debug("Enabling TLS for MQTT")
     client.tls_set()
 
-client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
+client.username_pw_set(config['mqtt']['username'], config['mqtt']['password'])
 
 #----------------------------------------------------------------
 # Start a background thread to connect to the MQTT network.
 logging.debug("Starting background thread for MQTT connection")
 client.isConnected=False
-client.connect_async(config['mqtt_hostname'], port=config['mqtt_portnumber'],
-        keepalive=config['mqtt_keepalive'])
+client.connect_async(config['mqtt']['hostname'], port=config['mqtt']['portnumber'],
+        keepalive=config['mqtt']['keepalive'])
 client.loop_start()
 
 # wait until all the above MQTT stuff was successful
@@ -193,7 +193,7 @@ while not client.isConnected:
 ################################################################
 # Connect to the serial device
 #  Needs 9600 8N1 with all flow control disabled
-serial_port = serial.Serial(config['serial_port_name'], baudrate=config['serial_port_baud'], bytesize=8, parity='N', stopbits=1, timeout=1.0, xonxoff=False, rtscts=False, dsrdtr=False)
+serial_port = serial.Serial(config['serialPort']['name'], baudrate=config['serialPort']['baud'], bytesize=8, parity='N', stopbits=1, timeout=1.0, xonxoff=False, rtscts=False, dsrdtr=False)
 # TODO: ensure checking the serial port was successful
 
 ################################################################
@@ -204,7 +204,7 @@ time.sleep(0.2)
 serial_port.write(b'\r*modelname=?#\r')
 
 # Start into the event loop
-logging.info(f"Entering event loop for {config['serial_port_name']}.  SIGINT to quit.")
+logging.info(f"Entering event loop for {config['serialPort']['name']}.  SIGINT to quit.")
 while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
