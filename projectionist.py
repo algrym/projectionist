@@ -88,7 +88,7 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
-    client.subscribe(config['mqtt_topic_prefix/#'])
+    client.subscribe(config['mqtt_topic_prefix'] + "/#")
     return
 
 #----------------------------------------------------------------
@@ -113,6 +113,11 @@ def on_message(client, userdata, msg):
     return
 
 #----------------------------------------------------------------
+# This faux-callback gets called when there's incoming serial input
+def parseSerialInput(input):
+    logging.debug(f"serial: {input}")
+
+################################################################
 # Launch the MQTT network client
 logging.debug("Setting up MQTT client")
 client = mqtt.Client(client_id=platform.node(), clean_session=True)
@@ -127,18 +132,22 @@ if config['mqtt_use_tls']:
 
 client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
 
+#----------------------------------------------------------------
 # Start a background thread to connect to the MQTT network.
 logging.debug("Starting background thread for MQTT connection")
-client.connect_async(config['mqtt_hostname'], port=config['mqtt_portnumber'], keepalive=config['mqtt_keepalive'])
+client.connect_async(config['mqtt_hostname'], port=config['mqtt_portnumber'],
+        keepalive=config['mqtt_keepalive'])
 client.loop_start()
 
-# TOOD: check that all the above MQTT stuff was successful
+# TODO: wait until all the above MQTT stuff was successful
 
 ################################################################
 # Connect to the serial device
 #  Needs 9600 8N1 with all flow control disabled
 serial_port = serial.Serial(config['serial_port_name'], baudrate=config['serial_port_baud'], bytesize=8, parity='N', stopbits=1, timeout=1.0, xonxoff=False, rtscts=False, dsrdtr=False)
+# TODO: ensure checking the serial port was successful
 
+################################################################
 # wait briefly for the system to complete waking up
 time.sleep(0.2)
 
@@ -150,4 +159,4 @@ logging.info(f"Entering event loop for {config['serial_port_name']}.  SIGINT to 
 while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
-        logging.info(f"serial: {input}")
+        parseSerialInput(input)
