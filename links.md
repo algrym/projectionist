@@ -6,6 +6,7 @@
 ## Using Home Assistant and MQTT
 - https://www.home-assistant.io/docs/mqtt/discovery/
 - https://www.home-assistant.io/blog/2015/09/11/different-ways-to-use-mqtt-with-home-assistant/
+- This describes how to use HA's MQTT Auto-discovery: https://roelofjanelsinga.com/articles/mqtt-discovery-with-an-arduino/
 
 ## MQTT
 - http://www.steves-internet-guide.com/mqtt-python-beginners-course/
