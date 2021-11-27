@@ -4,7 +4,7 @@
 # sudo apt install python3-serial python3-serial-asyncio python3-paho-mqtt python3-pexpect python3-yaml
 
 ################################################################
-# Import standard Python libraries.
+# Import standard Python libraries - we're assuming POSIX
 import sys, time, signal, platform, logging, argparse
 
 # Import the MQTT client library.
@@ -62,18 +62,18 @@ def _sigint_handler(signalNumber, stackFrame):
     logging.debug("Closing serial port ...")
     if serial_port is not None:
         serial_port.close()
-    logging.info("Serial port closed") 
 
     logging.debug("Closing MQTT client ...")
     if client is not None:
         client.loop_stop()
         client.disconnect()
-    logging.info("MQTT client closed") 
 
     logging.info("Exiting.  You don't have to go home, but you can't stay here.")
     sys.exit(0)
 
-logging.debug("SIGINT handler installed")
+#----------------------------------------------------------------
+# Install SIGINT signal handler
+logging.debug("SIGINT handler ready")
 original_sigint_handler = signal.getsignal(signal.SIGINT)
 signal.signal(signal.SIGINT, _sigint_handler)
 
@@ -84,20 +84,26 @@ signal.signal(signal.SIGINT, _sigint_handler)
 # The callback for when the broker responds to our connection request.
 def on_connect(client, userdata, flags, rc):
     if rc==0:
-        client.isConnected=True
         logging.info(f"MQTT connect flags: {flags}, result code: {rc}")
+        client.isConnected=True
     elif rc==1:
         logging.error(f"MQTT connect refused: incorrect protocol version, flags: {flags}, result code: {rc}")
+        client.isConnected=False
     elif rc==2:
         logging.error(f"MQTT connect refused: invalid client identifier, flags: {flags}, result code: {rc}")
+        client.isConnected=False
     elif rc==3:
         logging.error(f"MQTT connect refused: server unavailable, flags: {flags}, result code: {rc}")
+        client.isConnected=False
     elif rc==4:
         logging.error(f"MQTT connect refused: bad username or password, flags: {flags}, result code: {rc}")
+        client.isConnected=False
     elif rc==5:
         logging.error(f"MQTT connect refused: not authorized, flags: {flags}, result code: {rc}")
+        client.isConnected=False
     else:
         logging.error(f"MQTT connect failed: unknown reason, flags: {flags}, result code: {rc}")
+        client.isConnected=False
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
@@ -114,7 +120,7 @@ def on_connect(client, userdata, flags, rc):
 #   qos is an integer quality of service indicator (0,1, or 2)
 #   mid is an integer message ID.
 def on_message(client, userdata, msg):
-    logging.debug(f"mqtt msg topic: {msg.topic} payload: {msg.payload}")
+    logging.debug(f"mqtt msg id: {msg.id} topic: {msg.topic} payload: {msg.payload}")
 
     # If the serial port is ready, re-transmit received messages to the
     # device. The msg.payload is a bytes object which can be directly sent to
