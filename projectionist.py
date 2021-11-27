@@ -5,7 +5,7 @@
 
 ################################################################
 # Import standard Python libraries.
-import sys, time, signal, pprint, platform, logging, argparse
+import sys, time, signal, platform, logging, argparse
 
 # Import the MQTT client library.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -51,8 +51,7 @@ logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logLev
 with open(args.config_file) as f:
     config = yaml.safe_load(f)
 
-logging.info(f"Configuration loaded from '{args.config_file}'")
-logging.debug(pprint.pformat(config))
+logging.info(f"Configuration loaded from '{args.config_file}': {config}")
 
 ################################################################
 # Attach a handler to the keyboard interrupt (control-C).
@@ -68,6 +67,7 @@ def _sigint_handler(signalNumber, stackFrame):
     logging.debug("Closing MQTT client ...")
     if client is not None:
         client.loop_stop()
+        client.disconnect()
     logging.info("MQTT client closed") 
 
     logging.info("Exiting.  You don't have to go home, but you can't stay here.")
@@ -85,21 +85,19 @@ signal.signal(signal.SIGINT, _sigint_handler)
 def on_connect(client, userdata, flags, rc):
     if rc==0:
         client.isConnected=True
-        logging.info(f"MQTT connected with flags: {flags}, result code: {rc}")
+        logging.info(f"MQTT connect flags: {flags}, result code: {rc}")
     elif rc==1:
-        logging.error(f"MQTT bad connection (Connection refused – incorrect protocol version) with flags: {flags}, result code: {rc}")
+        logging.error(f"MQTT connect refused: incorrect protocol version, flags: {flags}, result code: {rc}")
     elif rc==2:
-        logging.error(f"MQTT bad connection (Connection refused – invalid client identifier) with flags: {flags}, result code: {rc}")
+        logging.error(f"MQTT connect refused: invalid client identifier, flags: {flags}, result code: {rc}")
     elif rc==3:
-        logging.error(f"MQTT bad connection (Connection refused – server unavailable) with flags: {flags}, result code: {rc}")
+        logging.error(f"MQTT connect refused: server unavailable, flags: {flags}, result code: {rc}")
     elif rc==4:
-        logging.error(f"MQTT bad connection (Connection refused – bad username or password) with flags: {flags}, result code: {rc}")
+        logging.error(f"MQTT connect refused: bad username or password, flags: {flags}, result code: {rc}")
     elif rc==5:
-        logging.error(f"MQTT bad connection (Connection refused – not authorized) with flags: {flags}, result code: {rc}")
+        logging.error(f"MQTT connect refused: not authorized, flags: {flags}, result code: {rc}")
     else:
-        logging.error(f"MQTT bad connection (unknown reason) with flags: {flags}, result code: {rc}")
-    logging.debug(f"MQTT config: {config}")
-    logging.debug(f"MQTT userdata: {userdata}")
+        logging.error(f"MQTT connect failed: unknown reason, flags: {flags}, result code: {rc}")
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
@@ -116,7 +114,7 @@ def on_connect(client, userdata, flags, rc):
 #   qos is an integer quality of service indicator (0,1, or 2)
 #   mid is an integer message ID.
 def on_message(client, userdata, msg):
-    logging.debug(f"mqtt: topic: {msg.topic} payload: {msg.payload}")
+    logging.debug(f"mqtt msg topic: {msg.topic} payload: {msg.payload}")
 
     # If the serial port is ready, re-transmit received messages to the
     # device. The msg.payload is a bytes object which can be directly sent to
@@ -126,6 +124,12 @@ def on_message(client, userdata, msg):
         # TODO: MQTT requests to commands should come from config.yaml
         #serial_port.write(msg.payload + b'\n')
     return
+
+#----------------------------------------------------------------
+# called when the client disconnects from the broker.
+def on_disconnect(client, userdata, rc):
+    logging.debug(f"mqtt disconnect client: {client} userdata: {userdata} rc: {rc}")
+    client.isConnected=False
 
 #----------------------------------------------------------------
 # This faux-callback gets called when there's incoming serial input
@@ -138,8 +142,10 @@ logging.debug("Setting up MQTT client")
 client = mqtt.Client(client_id=platform.node(), clean_session=True)
 client.enable_logger(logger=logging)
 
+# Assign callbacks
 client.on_connect = on_connect
 client.on_message = on_message
+client.on_disconnect = on_disconnect
 
 if config['mqtt_use_tls']:
     logging.debug("Enabling TLS for MQTT")
