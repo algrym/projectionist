@@ -83,8 +83,23 @@ signal.signal(signal.SIGINT, _sigint_handler)
 #----------------------------------------------------------------
 # The callback for when the broker responds to our connection request.
 def on_connect(client, userdata, flags, rc):
-    logging.info(f"MQTT connected with flags: {flags}, result code: {rc}")
-    logging.debug(pprint.pformat(client))
+    if rc==0:
+        client.isConnected=True
+        logging.info(f"MQTT connected with flags: {flags}, result code: {rc}")
+    elif rc==1:
+        logging.error(f"MQTT bad connection (Connection refused – incorrect protocol version) with flags: {flags}, result code: {rc}")
+    elif rc==2:
+        logging.error(f"MQTT bad connection (Connection refused – invalid client identifier) with flags: {flags}, result code: {rc}")
+    elif rc==3:
+        logging.error(f"MQTT bad connection (Connection refused – server unavailable) with flags: {flags}, result code: {rc}")
+    elif rc==4:
+        logging.error(f"MQTT bad connection (Connection refused – bad username or password) with flags: {flags}, result code: {rc}")
+    elif rc==5:
+        logging.error(f"MQTT bad connection (Connection refused – not authorized) with flags: {flags}, result code: {rc}")
+    else:
+        logging.error(f"MQTT bad connection (unknown reason) with flags: {flags}, result code: {rc}")
+    logging.debug(f"MQTT config: {config}")
+    logging.debug(f"MQTT userdata: {userdata}")
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
@@ -135,11 +150,15 @@ client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
 #----------------------------------------------------------------
 # Start a background thread to connect to the MQTT network.
 logging.debug("Starting background thread for MQTT connection")
+client.isConnected=False
 client.connect_async(config['mqtt_hostname'], port=config['mqtt_portnumber'],
         keepalive=config['mqtt_keepalive'])
 client.loop_start()
 
-# TODO: wait until all the above MQTT stuff was successful
+# wait until all the above MQTT stuff was successful
+while not client.isConnected:
+    logging.debug("Sleeping for MQTT connection ...")
+    time.sleep(1)
 
 ################################################################
 # Connect to the serial device
