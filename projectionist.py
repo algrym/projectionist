@@ -120,7 +120,7 @@ def on_connect(client, userdata, flags, rc):
 #   qos is an integer quality of service indicator (0,1, or 2)
 #   mid is an integer message ID.
 def on_message(client, userdata, msg):
-    logging.debug(f"mqtt msg id: {msg.id} topic: {msg.topic} payload: {msg.payload}")
+    logging.debug(f"mqtt msg mid: {msg.mid} topic: {msg.topic} payload: {msg.payload}")
 
     # If the serial port is ready, re-transmit received messages to the
     # device. The msg.payload is a bytes object which can be directly sent to
@@ -134,13 +134,18 @@ def on_message(client, userdata, msg):
 #----------------------------------------------------------------
 # called when the client disconnects from the broker.
 def on_disconnect(client, userdata, rc):
-    logging.debug(f"mqtt disconnect client: {client} userdata: {userdata} rc: {rc}")
+    logging.debug(f"mqtt disconnect userdata: {userdata} rc: {rc}")
     client.isConnected=False
 
 #----------------------------------------------------------------
 # This faux-callback gets called when there's incoming serial input
 def parseSerialInput(input):
-    logging.debug(f"serial: {input}")
+    if input.startswith('*MODELNAME='):
+        logging.debug(f"serial: MODELNAME {input[11:-1]}")
+        client.publish(config['mqtt_topic_prefix'] + "/modelname",
+                payload=input[11:-1], qos=0, retain=True)
+    else:
+        logging.debug(f"serial: {input}")
 
 ################################################################
 # Launch the MQTT network client
