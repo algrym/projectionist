@@ -5,9 +5,11 @@ mqtt:
   username: projuser
   password: NOPENOPENOPE
   topic:
+    name: "Sample Projector"
     prefix: projectionist
     node_id: HOSTNAME
     object_id: tk850
+    unique_id: tk850_sample
   discovery:
     prefix: homeassistant
   keepalive: 120
@@ -17,3 +19,7 @@ serialPort:
   baud: 9600
 worker:
   delay: 60
+device:
+  manufacturer: BENQ
+  model: TK850
+  suggested_area: "Sample Room"

@@ -4,19 +4,22 @@
 # sudo apt install python3-serial python3-serial-asyncio python3-paho-mqtt python3-pexpect python3-yaml
 
 ################################################################
-# Import standard Python libraries - we're assuming POSIX
+# Import libraries - we're _assuming_ POSIX
 import sys, time, signal, platform, logging, argparse, queue, threading
 
-# Import the MQTT client library.
+# Paho MQTT client to interface with Home Asssitant.
 #   https://www.eclipse.org/paho/clients/python/docs/
 import paho.mqtt.client as mqtt
 
-# Import the pySerial library.
+# pySerial for COM port access
 #   https://pyserial.readthedocs.io/en/latest/
 import serial
 
-# Import the PyYAML library.
+# PyYAML for config files
 import yaml
+
+# JSON for config topics
+import json
 
 ################################################################
 # Global script variables.
@@ -31,7 +34,7 @@ serialQ = None
 
 ################################################################
 # Initial Setup
-print("Projectionist - Heading into the projection booth ...")
+print("Projectionist v0.1 - Heading into the projection booth ...")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -68,6 +71,10 @@ if config['mqtt']['topic']['node_id'] == 'HOSTNAME':
 
 # topic: <prefix>/[<node_id>/]<object_id>
 mqtt_topic = f"{config['mqtt']['topic']['prefix']}/{config['mqtt']['topic']['node_id']}/{ config['mqtt']['topic']['object_id']}"
+
+# LWT := Last will and testament
+availability_topic = mqtt_topic + "/LWT"
+
 logging.debug(f"MQTT using topic: {mqtt_topic}")
 
 ################################################################
@@ -82,9 +89,9 @@ def _sigint_handler(signalNumber, stackFrame):
 
     logging.debug("Closing MQTT client ...")
     if client is not None:
+        publish_availability(False)
         client.loop_stop()
         client.disconnect()
-    # TODO: Update mqtt availability topic on connect
 
     logging.info("Exiting.  You don't have to go home, but you can't stay here.")
     sys.exit(0)
@@ -107,32 +114,39 @@ def on_connect(client, userdata, flags, rc):
     elif rc==1:
         logging.error(f"MQTT connect refused: incorrect protocol version, flags: {flags}, result code: {rc}")
         client.isConnected=False
+        return
     elif rc==2:
         logging.error(f"MQTT connect refused: invalid client identifier, flags: {flags}, result code: {rc}")
         client.isConnected=False
+        return
     elif rc==3:
         logging.error(f"MQTT connect refused: server unavailable, flags: {flags}, result code: {rc}")
         client.isConnected=False
+        return
     elif rc==4:
         logging.error(f"MQTT connect refused: bad username or password, flags: {flags}, result code: {rc}")
         client.isConnected=False
+        return
     elif rc==5:
         logging.error(f"MQTT connect refused: not authorized, flags: {flags}, result code: {rc}")
         client.isConnected=False
+        return
     else:
         logging.error(f"MQTT connect failed: unknown reason, flags: {flags}, result code: {rc}")
         client.isConnected=False
+        return
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
-    # TODO: Use https://github.com/eclipse/paho.mqtt.python#message_callback_add
 
     # Subscribe to the appropriate locations
+    # TODO: Use https://github.com/eclipse/paho.mqtt.python#message_callback_add
     client.subscribe(mqtt_topic + "/power/set")
     client.subscribe(mqtt_topic + "/source/set")
     client.subscribe(mqtt_topic + "/blank/set")
 
-    # TODO: Update mqtt availability topic on connect
+    # Update mqtt availability topic on connect
+    publish_availability(client.isConnected)
     return
 
 #----------------------------------------------------------------
@@ -176,7 +190,7 @@ def parseSerialInput(input):
     # Trim stuff from the beginning and end of the input
     input.strip()
 
-    # Look for words we know, and ignore what we don't
+    # Ignore input that's echo'd back from the projector
     if input.startswith('>'):
         logging.debug(f"serial: echo {input}")
 
@@ -185,6 +199,7 @@ def parseSerialInput(input):
         logging.debug(f"serial: weird power-on state message {input}")
         serialQ.put(b'\r*pow=?#\r')
 
+    # Handle various known responses from the projector
     elif input.startswith('*MODELNAME='):
         logging.debug(f"serial: found MODELNAME={input[11:-1]}")
         mqtt_publish(topic=mqtt_topic + "/modelname",
@@ -193,7 +208,7 @@ def parseSerialInput(input):
     elif input.startswith('*LTIM='):
         logging.debug(f"serial: found LTIM={input[6:-1]}")
         mqtt_publish(topic=mqtt_topic + "/lamphour",
-            payload=input[6:-1], retain=True)
+            payload=input[6:-1], retain=False)
 
     elif input.startswith('*POW='):
         logging.debug(f"serial: found POW={input[5:-1]}")
@@ -264,17 +279,67 @@ def msg_to_cmds(msg_command, msg_payload):
     return
 
 #----------------------------------------------------------------
+# Update the availability topic of the device
+#   https://www.hivemq.com/blog/mqtt-essentials-part-9-last-will-and-testament/
+def publish_availability(available=True):
+    if available:
+        mqtt_publish(topic=availability_topic, payload="Online", retain=False)
+    else:
+        mqtt_publish(topic=availability_topic, payload="Offline", retain=True)
+    return
+
+#----------------------------------------------------------------
+# Build and publish the configuration for related devices
+# - Switch for /power
+def publish_switch_config():
+    logging.info(f"Transmitting JSON to config topic")
+
+    config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{config['mqtt']['topic']['node_id']}/{ config['mqtt']['topic']['object_id']}"
+
+    # Setting up power
+    power_switch_config = {
+        "name": config['mqtt']['topic']['name'] + ' power',
+        "state_topic": mqtt_topic + "/power",
+        "command_topic": mqtt_topic + "/power/set",
+        "payload_off": "OFF",
+        "payload_on": "ON",
+        "value_template": "{{value_json.power}}",
+        "availability_topic": mqtt_topic + "/LWT",
+        "payload_available": "Online",
+        "payload_not_available": "Offline",
+        "unique_id": config['mqtt']['topic']['unique_id'],
+        "device": {
+            "via_device": platform.node(),
+            "manufacturer": config['device']['manufacturer'],
+            "model": config['device']['model'],
+            "identifiers": config['mqtt']['topic']['unique_id'],
+            }
+    }
+    #print(json.dumps(power_switch_config, sort_keys=False, indent=2))
+    mqtt_publish(topic=config_topic,
+           payload=json.dumps(power_switch_config), retain=False)
+    return
+
+#----------------------------------------------------------------
 # Worker thread to periodically push initial commands onto the serial queue
 def worker():
     while True:
         logging.info(f"worker awakens! Updating state information")
+
+        # Poke the projector into updating its current state
         serialQ.put(b'\r*modelname=?#\r')
         serialQ.put(b'\r*ltim=?#\r')
         serialQ.put(b'\r*pow=?#\r')
         serialQ.put(b'\r*sour=?#\r')
         serialQ.put(b'\r*blank=?#\r')
 
-        # TODO: periodically send discovery config updates
+        # Publish the config for the projector
+        publish_switch_config()
+        # TODO: publish select config for /source
+        # TODO: publish switch config for /blank
+
+        # Publish availability
+        publish_availability(True)
 
         logging.info(f"worker updates queued. Sleeping for {config['worker']['delay']} secs")
         time.sleep(config['worker']['delay'])
