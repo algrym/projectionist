@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -W all
 
 # List of Raspbian pre-req packages
 # sudo apt install python3-serial python3-serial-asyncio python3-paho-mqtt python3-pexpect python3-yaml
@@ -42,7 +42,7 @@ if args.verbose:
     logLevel=logging.DEBUG
 else:
     logLevel=logging.WARNING
-# TODO: log output may need to change when we start interfacing with systemd
+# TODO: log output needs to change when we start interfacing with systemd
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logLevel)
 
 ################################################################
@@ -72,7 +72,7 @@ def _sigint_handler(signalNumber, stackFrame):
     sys.exit(0)
 
 #----------------------------------------------------------------
-# Install SIGINT signal handler
+# Install SIGINT signal handler ASAP
 logging.debug("SIGINT handler ready")
 original_sigint_handler = signal.getsignal(signal.SIGINT)
 signal.signal(signal.SIGINT, _sigint_handler)
@@ -108,6 +108,7 @@ def on_connect(client, userdata, flags, rc):
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
     client.subscribe(config['mqtt_topic_prefix'] + "/#")
+    # TODO: Use https://github.com/eclipse/paho.mqtt.python#message_callback_add
     return
 
 #----------------------------------------------------------------
@@ -136,16 +137,28 @@ def on_message(client, userdata, msg):
 def on_disconnect(client, userdata, rc):
     logging.debug(f"mqtt disconnect userdata: {userdata} rc: {rc}")
     client.isConnected=False
+    return
+
+#----------------------------------------------------------------
+# Handle the details of an mqtt publish
+def mqtt_publish(topic, payload, retain=False):
+    result = client.publish(topic, payload=payload, qos=0, retain=retain)
+    if result.rc == 0 and result.is_published():
+        logging.debug(f"mqtt publish success mid: {result.mid}")
+    else:
+        logging.debug(f"mqtt publish failed mid: {result.mid} rc: {result.rc} result.is_published()={result.is_published()}")
+    return
 
 #----------------------------------------------------------------
 # This faux-callback gets called when there's incoming serial input
 def parseSerialInput(input):
     if input.startswith('*MODELNAME='):
         logging.debug(f"serial: MODELNAME {input[11:-1]}")
-        client.publish(config['mqtt_topic_prefix'] + "/modelname",
-                payload=input[11:-1], qos=0, retain=True)
+        mqtt_publish(topic=config['mqtt_topic_prefix'] + "/modelname",
+            payload=input[11:-1], retain=True)
     else:
         logging.debug(f"serial: {input}")
+    return
 
 ################################################################
 # Launch the MQTT network client
