@@ -309,21 +309,18 @@ client.loop_start()
 # Connect to the serial device
 #  Needs 9600 8N1 with all flow control disabled
 serial_port = serial.Serial(config['serialPort']['name'], baudrate=config['serialPort']['baud'], bytesize=8, parity='N', stopbits=1, timeout=1.0, xonxoff=False, rtscts=False, dsrdtr=False)
-# TODO: ensure checking the serial port was successful
+# TODO: ensure setting up the serial port was successful
 
 ################################################################
-# wait briefly for the system to complete waking up
-time.sleep(0.2)
-
 # Start thread to periodically push initial commands onto the serial queue
 threading.Thread(target=worker, daemon=True).start()
 
-# Start into the event loop
+# Start the event loop
 logging.info(f"Entering event loop for {config['serialPort']['name']}.  SIGINT to quit.")
 while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
         parseSerialInput(input)
-    processQueues()
+    if not publishQ.empty() or not serialQ.empty():
+        processQueues()
 
-    #if not publishQ.empty() and not serialQ.empty():

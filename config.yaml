@@ -16,4 +16,4 @@ serialPort:
   name: /dev/ttyUSB0
   baud: 9600
 worker:
-  delay: 300
+  delay: 60
