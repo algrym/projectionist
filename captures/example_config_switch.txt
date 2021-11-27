@@ -23,3 +23,21 @@ When expanded into "pretty" JSON, it looks like this:
 }
 
 When abbreviations are expanded, it looks like this:
+
+{
+  "name": "3DPrinter",
+  "state_topic": "tele/EZPlug_35EBF6/STATE",
+  "availability_topic": "tele/EZPlug_35EBF6/LWT",
+  "payload_available": "Online",
+  "payload_not_available": "Offline",
+  "command_topic": "cmnd/EZPlug_35EBF6/POWER1",
+  "payload_off": "OFF",
+  "payload_on": "ON",
+  "value_template": "{{value_json.POWER1}}",
+  "unique_id": "35EBF6_RL_1",
+  "device": {
+    "ids": [
+      "35EBF6"
+    ]
+  }
+}
