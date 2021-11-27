@@ -5,7 +5,7 @@
 
 ################################################################
 # Import standard Python libraries.
-import sys, time, signal, pprint, platform, logging
+import sys, time, signal, pprint, platform, logging, argparse
 
 # Import the MQTT client library.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -28,37 +28,52 @@ original_sigint_handler = None
 
 ################################################################
 # Initial Setup
-logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.DEBUG)
+print("Projectionist - Heading into the projection booth ...")
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--config-file', default='config.yaml',
+            help="load configuration from CONFIG_FILE")
+    parser.add_argument('-v', '--verbose', action="store_true",
+            help="output additional information")
+    args = parser.parse_args()
+
+if args.verbose:
+    logLevel=logging.DEBUG
+else:
+    logLevel=logging.WARNING
+# TODO: log output may need to change when we start interfacing with systemd
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logLevel)
 
 ################################################################
 # Load config from file
 #  TODO: Handle invalid YAML
-with open('config.yaml') as f:
+with open(args.config_file) as f:
     config = yaml.safe_load(f)
 
-print ("- Configuration loaded from 'config.yaml':")
-pprint.pprint(config)
+logging.info(f"Configuration loaded from '{args.config_file}'")
+logging.debug(pprint.pformat(config))
 
 ################################################################
 # Attach a handler to the keyboard interrupt (control-C).
 def _sigint_handler(signalNumber, stackFrame):
-    print("\n- Keyboard interrupt caught, closing down...")
+    logging.info("SIGINT caught, closing down ...")
     signal.signal(signal.SIGINT, original_sigint_handler)
 
-    print("- Closing serial port ...", end = '')
+    logging.debug("Closing serial port ...")
     if serial_port is not None:
         serial_port.close()
-    print("done.")
+    logging.info("Serial port closed") 
 
-    print("- Closing MQTT client ...", end = '')
+    logging.debug("Closing MQTT client ...")
     if client is not None:
         client.loop_stop()
-    print("done.")
+    logging.info("MQTT client closed") 
 
-    print("- Exiting.  You don't have to go home, but you can't stay here.")
+    logging.info("Exiting.  You don't have to go home, but you can't stay here.")
     sys.exit(0)
 
-print("- SIGINT handler installed.")
+logging.debug("SIGINT handler installed")
 original_sigint_handler = signal.getsignal(signal.SIGINT)
 signal.signal(signal.SIGINT, _sigint_handler)
 
@@ -68,8 +83,8 @@ signal.signal(signal.SIGINT, _sigint_handler)
 #----------------------------------------------------------------
 # The callback for when the broker responds to our connection request.
 def on_connect(client, userdata, flags, rc):
-    print(f"- MQTT connected with flags: {flags}, result code: {rc}")
-    pprint.pprint(client)
+    logging.info(f"MQTT connected with flags: {flags}, result code: {rc}")
+    logging.debug(pprint.pformat(client))
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
@@ -86,7 +101,7 @@ def on_connect(client, userdata, flags, rc):
 #   qos is an integer quality of service indicator (0,1, or 2)
 #   mid is an integer message ID.
 def on_message(client, userdata, msg):
-    print(f"mqtt: topic: {msg.topic} payload: {msg.payload}")
+    logging.debug(f"mqtt: topic: {msg.topic} payload: {msg.payload}")
 
     # If the serial port is ready, re-transmit received messages to the
     # device. The msg.payload is a bytes object which can be directly sent to
@@ -99,7 +114,7 @@ def on_message(client, userdata, msg):
 
 #----------------------------------------------------------------
 # Launch the MQTT network client
-print ("- Setting up MQTT client")
+logging.debug("Setting up MQTT client")
 client = mqtt.Client(client_id=platform.node(), clean_session=True)
 client.enable_logger(logger=logging)
 
@@ -107,13 +122,13 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 if config['mqtt_use_tls']:
-    print("- Enabling TLS for MQTT")
+    logging.debug("Enabling TLS for MQTT")
     client.tls_set()
 
 client.username_pw_set(config['mqtt_username'], config['mqtt_password'])
 
 # Start a background thread to connect to the MQTT network.
-print ("- Starting background thread for MQTT connection")
+logging.debug("Starting background thread for MQTT connection")
 client.connect_async(config['mqtt_hostname'], port=config['mqtt_portnumber'], keepalive=config['mqtt_keepalive'])
 client.loop_start()
 
@@ -127,11 +142,12 @@ serial_port = serial.Serial(config['serial_port_name'], baudrate=config['serial_
 # wait briefly for the system to complete waking up
 time.sleep(0.2)
 
+# Get initial information from the device
 serial_port.write(b'\r*modelname=?#\r')
 
-print(f"- Entering event loop for {config['serial_port_name']}.  Enter Control-C to quit.")
-
+# Start into the event loop
+logging.info(f"Entering event loop for {config['serial_port_name']}.  SIGINT to quit.")
 while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
-        print(f"serial: {input}")
+        logging.info(f"serial: {input}")

@@ -129,4 +129,7 @@ dmypy.json
 .pyre/
 
 # Don't include local config
-config.yaml
+config-local.yaml
+
+# ignore vim swap files
+*.swp
