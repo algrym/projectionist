@@ -5,7 +5,8 @@
 
 ################################################################
 # Import libraries - we're _assuming_ POSIX
-import sys, time, signal, platform, logging, argparse, queue, threading
+import sys, time, signal, platform, logging, argparse, queue,
+    threading, systemd.daemon
 
 # Paho MQTT client to interface with Home Asssitant.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -423,6 +424,8 @@ threading.Thread(target=worker, daemon=True).start()
 
 # Start the event loop
 logging.info(f"Entering event loop for {config['serialPort']['name']}.  SIGINT to quit.")
+# Tell systemd that our service is ready
+systemd.daemon.notify('READY=1')
 while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
