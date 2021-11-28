@@ -1,12 +1,14 @@
 #!/usr/bin/python3 -W all
 
-# List of Raspbian pre-req packages
-# sudo apt install python3-serial python3-serial-asyncio python3-paho-mqtt python3-pexpect python3-yaml
+# List of Raspbian pre-req packages, assuming Raspian (buster)
+# sudo apt install python3-serial python3-serial-asyncio \
+#        python3-paho-mqtt python3-pexpect python3-yaml \
+#        python3-systemd
 
 ################################################################
 # Import libraries - we're _assuming_ POSIX
-import sys, time, signal, platform, logging, argparse, queue,
-    threading, systemd.daemon
+import sys, time, signal, platform, logging, argparse, queue
+import threading, systemd.daemon
 
 # Paho MQTT client to interface with Home Asssitant.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -178,6 +180,9 @@ def on_disconnect(client, userdata, rc):
 #----------------------------------------------------------------
 # Handle the details of an mqtt publish
 def mqtt_publish(topic, payload, retain=False):
+    if not client.isConnected:
+        return
+
     result = client.publish(topic, payload=payload, qos=0, retain=retain)
     if result.rc == 0 and result.is_published():
         logging.debug(f"mqtt publish success mid: {result.mid}")
@@ -272,10 +277,14 @@ def msg_to_cmds(msg_command, msg_payload):
         serialQ.put(b'\r*pow=?#\r')
 
     elif msg_command == 'source':
-        if msg_payload == b'hdmi1':
+        if msg_payload == b'HDMI' or msg_payload == b'HDMI1':
             serialQ.put(b'\r*sour=hdmi#\r')
-        elif msg_payload == b'hdmi2':
+        elif msg_payload == b'HDMI2':
             serialQ.put(b'\r*sour=hdmi2#\r')
+        elif msg_payload == b'RGB':
+            serialQ.put(b'\r*sour=rgb#\r')
+        elif msg_payload == b'USB':
+            serialQ.put(b'\r*sour=usbreader#\r')
         serialQ.put(b'\r*sour=?#\r')
     return
 
@@ -419,6 +428,9 @@ serial_port = serial.Serial(config['serialPort']['name'], baudrate=config['seria
 # TODO: ensure setting up the serial port was successful
 
 ################################################################
+# wait briefly for the system to complete waking up
+time.sleep(1)
+
 # Start thread to periodically push initial commands onto the serial queue
 threading.Thread(target=worker, daemon=True).start()
 
