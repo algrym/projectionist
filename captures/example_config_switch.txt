@@ -1,4 +1,6 @@
-When captured from MQTT, it looks like this:
+When captured from MQTT, a Tasmota power switch looks like this:
+
+Topic: homeassistant/switch/35EBF6_RL_1
 
 {"name":"3DPrinter","stat_t":"tele/EZPlug_35EBF6/STATE","avty_t":"tele/EZPlug_35EBF6/LWT","pl_avail":"Online","pl_not_avail":"Offline","cmd_t":"cmnd/EZPlug_35EBF6/POWER1","pl_off":"OFF","pl_on":"ON","val_tpl":"{{value_json.POWER1}}","uniq_id":"35EBF6_RL_1","dev":{"ids":["35EBF6"]}}
 
