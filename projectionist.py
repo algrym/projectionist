@@ -282,6 +282,7 @@ def msg_to_cmds(msg_command, msg_payload):
 # Update the availability topic of the device
 #   https://www.hivemq.com/blog/mqtt-essentials-part-9-last-will-and-testament/
 def publish_availability(available=True):
+    logging.debug(f"publish availability topic: {availability_topic} available={available}")
     if available:
         mqtt_publish(topic=availability_topic, payload="Online", retain=False)
     else:
