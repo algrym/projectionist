@@ -26,8 +26,6 @@ import json
 
 ################################################################
 # Global script variables.
-
-# TODO: get this naming standard nonsense under control.
 serial_port = None
 client = None
 config = None
@@ -51,7 +49,6 @@ if args.verbose:
     logLevel=logging.DEBUG
 else:
     logLevel=logging.WARNING
-# TODO: log output needs to change when we start interfacing with systemd
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logLevel)
 
 # Initial setup of the inbound and outbound queues
@@ -60,7 +57,6 @@ serialQ = queue.Queue()
 
 ################################################################
 # Load config from file
-#  TODO: Handle invalid YAML
 with open(args.config_file) as f:
     config = yaml.safe_load(f)
 
@@ -68,7 +64,6 @@ logging.info(f"Configuration loaded from '{args.config_file}': {config}")
 
 #----------------------------------------------------------------
 # Setup composite config elements
-# TODO: Check config to ensure necessary items exist and are in scope
 if config['mqtt']['topic']['node_id'] == 'HOSTNAME':
     config['mqtt']['topic']['node_id'] = platform.node()
 
@@ -143,7 +138,6 @@ def on_connect(client, userdata, flags, rc):
     # connection and reconnect then subscriptions will be renewed.
 
     # Subscribe to the appropriate locations
-    # TODO: Use https://github.com/eclipse/paho.mqtt.python#message_callback_add
     client.subscribe(mqtt_topic + "/power/set")
     client.subscribe(mqtt_topic + "/source/set")
     client.subscribe(mqtt_topic + "/blank/set")
@@ -156,8 +150,6 @@ def on_connect(client, userdata, flags, rc):
 # The callback for when a message has been received on a topic to which this
 # client is subscribed.  The message variable is a MQTTMessage that describes
 # all of the message parameters.
-
-# TODO: MQTT request to command mapping should come from config.yaml
 
 # Some useful MQTTMessage fields: topic, payload, qos, retain, mid, properties.
 #   The payload is a binary string (bytes).
@@ -374,8 +366,6 @@ def worker():
     while True:
         logging.info(f"worker awakens! Updating state information")
 
-        # TODO: we should only sent MQTT updates when the status changes
-
         # Poke the projector into updating its current state
         serialQ.put(b'\r*modelname=?#\r')
         serialQ.put(b'\r*ltim=?#\r')
@@ -386,8 +376,6 @@ def worker():
         # Publish the config for the projector
         publish_switch_config()
         publish_select_config()
-        # TODO: publish select config for /source
-        # TODO: publish switch config for /blank
 
         # Publish availability
         publish_availability(True)
@@ -425,7 +413,6 @@ client.loop_start()
 # Connect to the serial device
 #  Needs 9600 8N1 with all flow control disabled
 serial_port = serial.Serial(config['serialPort']['name'], baudrate=config['serialPort']['baud'], bytesize=8, parity='N', stopbits=1, timeout=1.0, xonxoff=False, rtscts=False, dsrdtr=False)
-# TODO: ensure setting up the serial port was successful
 
 ################################################################
 # wait briefly for the system to complete waking up
