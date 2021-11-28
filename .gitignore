@@ -133,3 +133,6 @@ config-local.yaml
 
 # ignore vim swap files
 *.swp
+
+# ignore log files
+projectionist.out
