@@ -293,12 +293,13 @@ def publish_availability(available=True):
 # Build and publish the configuration for related devices
 # - Switch for /power
 def publish_switch_config():
-    logging.info(f"Transmitting JSON to config topic")
+    logging.info(f"Transmitting JSON to config switch topic")
 
     # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
     # Best practice for entities with a unique_id is to set <object_id> to unique_id and omit the <node_id>, so ...
     # <discovery_prefix>/<component>/<unique_id>/config
     config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{config['mqtt']['topic']['unique_id']}/config"
+    unique_id = config['mqtt']['topic']['unique_id'] + "_power"
 
     # Setting up power
     power_switch_config = {
@@ -311,17 +312,50 @@ def publish_switch_config():
         "availability_topic": mqtt_topic + "/LWT",
         "payload_available": "Online",
         "payload_not_available": "Offline",
-        "unique_id": config['mqtt']['topic']['unique_id'],
+        "unique_id": unique_id,
         "device": {
             "via_device": platform.node(),
             "manufacturer": config['device']['manufacturer'],
             "model": config['device']['model'],
-            "identifiers": config['mqtt']['topic']['unique_id'],
+            "identifiers": unique_id,
             }
     }
     #print(json.dumps(power_switch_config, sort_keys=False, indent=2))
     mqtt_publish(topic=config_topic,
            payload=json.dumps(power_switch_config), retain=False)
+    return
+
+#----------------------------------------------------------------
+# Build and publish the configuration for related devices
+# - Source for /source
+def publish_select_config():
+    logging.info(f"Transmitting JSON to config select topic")
+
+    # <discovery_prefix>/<component>/<unique_id>/config
+    config_topic = f"{config['mqtt']['discovery']['prefix']}/select/                                   {config['mqtt']['topic']['unique_id']}/config"
+    unique_id = config['mqtt']['topic']['unique_id'] + "_source"
+
+    # Setting up source select
+    source_select_config= {
+        "name": config['mqtt']['topic']['name'] + ' input source',
+        "state_topic": mqtt_topic + "/source",
+        "command_topic": mqtt_topic + "/source/set",
+        "options": ["HDMI", "HDMI2", "RGB", "USB"],
+        "value_template": "{{value_json.source}}",
+        "availability_topic": mqtt_topic + "/LWT",
+        "payload_available": "Online",
+        "payload_not_available": "Offline",
+        "unique_id": unique_id,
+        "device": {
+            "via_device": platform.node(),
+            "manufacturer": config['device']['manufacturer'],
+            "model": config['device']['model'],
+            "identifiers": unique_id,
+        }
+    }
+    #print(json.dumps(power_switch_config, sort_keys=False, indent=2))
+    mqtt_publish(topic=config_topic,
+           payload=json.dumps(source_select_config), retain=False)
     return
 
 #----------------------------------------------------------------
@@ -341,6 +375,7 @@ def worker():
 
         # Publish the config for the projector
         publish_switch_config()
+        publish_select_config()
         # TODO: publish select config for /source
         # TODO: publish switch config for /blank
 
