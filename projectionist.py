@@ -37,7 +37,7 @@ serialQ = None
 
 ################################################################
 # Initial Setup
-print("Projectionist v0.1 - Heading into the projection booth ...")
+print("Projectionist v1.0 - Heading into the projection booth ... It's aliiiive!")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
