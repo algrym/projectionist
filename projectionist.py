@@ -298,8 +298,8 @@ def publish_switch_config():
     # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
     # Best practice for entities with a unique_id is to set <object_id> to unique_id and omit the <node_id>, so ...
     # <discovery_prefix>/<component>/<unique_id>/config
-    config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{config['mqtt']['topic']['unique_id']}/config"
     unique_id = config['mqtt']['topic']['unique_id'] + "_power"
+    config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{unique_id}/config"
 
     # Setting up power
     power_switch_config = {
@@ -332,8 +332,8 @@ def publish_select_config():
     logging.info(f"Transmitting JSON to config select topic")
 
     # <discovery_prefix>/<component>/<unique_id>/config
-    config_topic = f"{config['mqtt']['discovery']['prefix']}/select/                                   {config['mqtt']['topic']['unique_id']}/config"
     unique_id = config['mqtt']['topic']['unique_id'] + "_source"
+    config_topic = f"{config['mqtt']['discovery']['prefix']}/select/{unique_id}/config"
 
     # Setting up source select
     source_select_config= {
