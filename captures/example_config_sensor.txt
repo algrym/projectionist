@@ -1,6 +1,6 @@
 When captured from MQTT, a Tasmota sensor looks like this:
 
-homeassistant/sensor/35EBF6_ENERGY_TotalStartTime/config
+Topic: homeassistant/sensor/35EBF6_ENERGY_TotalStartTime/config
 
 {"name":"3DPrinter ENERGY TotalStartTime","stat_t":"tele/EZPlug_35EBF6/SENSOR","avty_t":"tele/EZPlug_35EBF6/LWT","pl_avail":"Online","pl_not_avail":"Offline","uniq_id":"35EBF6_ENERGY_TotalStartTime","dev":{"ids":["35EBF6"]},"unit_of_meas":" ","ic":"mdi:progress-clock","frc_upd":true,"val_tpl":"{{value_json['ENERGY']['TotalStartTime']}}"}
 
