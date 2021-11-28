@@ -294,7 +294,10 @@ def publish_availability(available=True):
 def publish_switch_config():
     logging.info(f"Transmitting JSON to config topic")
 
-    config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{config['mqtt']['topic']['node_id']}/{ config['mqtt']['topic']['object_id']}"
+    # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
+    # Best practice for entities with a unique_id is to set <object_id> to unique_id and omit the <node_id>, so ...
+    # <discovery_prefix>/<component>/<unique_id>/config
+    config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{config['mqtt']['topic']['unique_id']}/config"
 
     # Setting up power
     power_switch_config = {
@@ -325,6 +328,8 @@ def publish_switch_config():
 def worker():
     while True:
         logging.info(f"worker awakens! Updating state information")
+
+        # TODO: we should only sent MQTT updates when the status changes
 
         # Poke the projector into updating its current state
         serialQ.put(b'\r*modelname=?#\r')
