@@ -32,6 +32,7 @@ config = None
 original_sigint_handler = None
 publishQ = None
 serialQ = None
+client_is_connected = False
 
 ################################################################
 # Initial Setup
@@ -69,11 +70,15 @@ if config['mqtt']['topic']['node_id'] == 'HOSTNAME':
 
 # topic: <prefix>/[<node_id>/]<object_id>
 mqtt_topic = f"{config['mqtt']['topic']['prefix']}/{config['mqtt']['topic']['node_id']}/{ config['mqtt']['topic']['object_id']}"
+logging.debug(f"MQTT using topic base: {mqtt_topic}")
 
 # LWT := Last will and testament
 availability_topic = mqtt_topic + "/LWT"
+logging.debug(f"MQTT using availability topic: {availability_topic}")
 
-logging.debug(f"MQTT using topic: {mqtt_topic}")
+# Compute the queue wait timeout
+queue_timeout = int(1.1 * int(config['worker']['delay']))
+logging.debug(f"using {queue_timeout}s queue timeout at 110% of worker delay ({config['worker']['delay']})")
 
 ################################################################
 # Attach a handler to the keyboard interrupt (control-C).
@@ -106,45 +111,47 @@ signal.signal(signal.SIGINT, _sigint_handler)
 #----------------------------------------------------------------
 # The callback for when the broker responds to our connection request.
 def on_connect(client, userdata, flags, rc):
+    global client_is_connected
     if rc==0:
         logging.info(f"MQTT connect flags: {flags}, result code: {rc}")
-        client.isConnected=True
+        client_is_connected = True
     elif rc==1:
         logging.error(f"MQTT connect refused: incorrect protocol version, flags: {flags}, result code: {rc}")
-        client.isConnected=False
+        client_is_connected = False
         return
     elif rc==2:
         logging.error(f"MQTT connect refused: invalid client identifier, flags: {flags}, result code: {rc}")
-        client.isConnected=False
+        client_is_connected = False
         return
     elif rc==3:
         logging.error(f"MQTT connect refused: server unavailable, flags: {flags}, result code: {rc}")
-        client.isConnected=False
+        client_is_connected = False
         return
     elif rc==4:
         logging.error(f"MQTT connect refused: bad username or password, flags: {flags}, result code: {rc}")
-        client.isConnected=False
+        client_is_connected = False
         return
     elif rc==5:
         logging.error(f"MQTT connect refused: not authorized, flags: {flags}, result code: {rc}")
-        client.isConnected=False
+        client_is_connected = False
         return
     else:
         logging.error(f"MQTT connect failed: unknown reason, flags: {flags}, result code: {rc}")
-        client.isConnected=False
+        client_is_connected = False
         return
 
     # Subscribing in on_connect() means that if we lose the
     # connection and reconnect then subscriptions will be renewed.
 
     # Subscribe to the appropriate locations
+    #   If you add more here, be sure to update the "topic.startswith"
+    #   section in on_message function
     client.subscribe(mqtt_topic + "/power/set")
     client.subscribe(mqtt_topic + "/source/set")
     client.subscribe(mqtt_topic + "/blank/set")
 
     # Update mqtt availability topic on connect
-    publish_availability(client.isConnected)
-    return
+    publish_availability(True)
 
 #----------------------------------------------------------------
 # The callback for when a message has been received on a topic to which this
@@ -160,27 +167,17 @@ def on_message(client, userdata, msg):
         msg_to_cmds(msg.topic.split('/')[3], msg.payload)
     else:
         logging.debug(f"mqtt msg unknown mid: {msg.mid} topic: {msg.topic} payload: {msg.payload}")
-    return
 
 #----------------------------------------------------------------
 # called when the client disconnects from the broker.
 def on_disconnect(client, userdata, rc):
     logging.debug(f"mqtt disconnect userdata: {userdata} rc: {rc}")
-    client.isConnected=False
-    return
 
 #----------------------------------------------------------------
 # Handle the details of an mqtt publish
+#   If the publish fails, put the item on the publishQ
 def mqtt_publish(topic, payload, retain=False):
-    if not client.isConnected:
-        return
-
-    result = client.publish(topic, payload=payload, qos=0, retain=retain)
-    if result.rc == 0 and result.is_published():
-        logging.debug(f"mqtt publish success mid: {result.mid}")
-    else:
-        logging.debug(f"mqtt publish failed mid: {result.mid} rc: {result.rc} result.is_published()={result.is_published()}")
-    return
+    publishQ.put((topic, payload, retain), block=True, timeout=queue_timeout)
 
 #----------------------------------------------------------------
 # This faux-callback gets called when there's incoming serial input
@@ -200,55 +197,65 @@ def parseSerialInput(input):
     # Handle various known responses from the projector
     elif input.startswith('*MODELNAME='):
         logging.debug(f"serial: found MODELNAME={input[11:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/modelname",
-            payload=input[11:-1], retain=True)
+        mqtt_publish(topic=mqtt_topic + "/modelname", payload=input[11:-1])
 
     elif input.startswith('*LTIM='):
         logging.debug(f"serial: found LTIM={input[6:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/lamphour",
-            payload=input[6:-1], retain=False)
+        mqtt_publish(topic=mqtt_topic + "/lamphour", payload=input[6:-1])
 
     elif input.startswith('*POW='):
         logging.debug(f"serial: found POW={input[5:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/power",
-            payload=input[5:-1], retain=True)
+        mqtt_publish(topic=mqtt_topic + "/power", payload=input[5:-1])
 
     elif input.startswith('*SOUR='):
         logging.debug(f"serial: found SOUR={input[6:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/source",
-            payload=input[6:-1], retain=True)
+        mqtt_publish(topic=mqtt_topic + "/source", payload=input[6:-1])
 
     elif input.startswith('*BLANK='):
         logging.debug(f"serial: found BLANK={input[7:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/blank",
-            payload=input[7:-1], retain=True)
+        mqtt_publish(topic=mqtt_topic + "/blank", payload=input[7:-1])
 
     else:
         logging.debug(f"serial: unknown {input}")
-    return
 
 #----------------------------------------------------------------
-# This faux-callback gets called when there's stuff to be sent
-def processQueues():
-    #logging.debug(f"processQueues publishQ.empty {publishQ.empty()} serialQ.empty {serialQ.empty()}")
+# This worker thread handles the outbound serial queue
+def serialQ_worker():
+    logging.debug(f"serialQ worker starting.")
+    while True:
+        # Block until there's an object on the queue
+        msg = serialQ.get(block=True, timeout=queue_timeout)
+        logging.debug(f"serialQ worker: msg: \"{msg}\"")
 
-    # Process one item off each queue, then return
-    #  I think its best to do the serial queue first
-    if not serialQ.empty():
-        msg = serialQ.get()
+        # Push the object from the queue out the serial port
         try:
             serial_port.write(msg)
         except Exception as e:
-            logging.error('serial write error msg: (msg) error: e')
+            logging.error('serialQ port write error msg: (msg) error: e')
             sys.exit(os.EX_IOERR)
+
+        # Let the queue know that we're successful
         serialQ.task_done()
+        time.sleep(0.1) # Don't spin if things go wrong
 
-    if client.isConnected and not publishQ.empty():
-        topic, msg, retain = publishQ.get()
-        mqtt_publish(topic=topic, payload=msg, retain=retain)
-        publishQ.task_done()
+#----------------------------------------------------------------
+# This worker thread handles the outbound serial queue
+def publishQ_worker():
+    logging.debug(f"publishQ worker starting.")
+    while True:
+        # Block until there's an object on the queue
+        topic, payload, retain = publishQ.get(block=True, timeout=queue_timeout)
+        logging.debug(f"publishQ worker: topic=\"{topic}\" payload=\"{payload}\" retain=\"{retain}\"")
 
-    return
+        # publish the object from the queue
+        result = client.publish(topic, payload=payload, qos=0, retain=retain)
+        if result.rc == 0 and result.is_published():
+            # Let the queue know that we're successful
+            logging.debug(f"publishQ worker success mid: {result.mid}")
+            publishQ.task_done()
+        else:
+            logging.debug(f"publishQ worker failed mid: {result.mid} rc: {result.rc} result.is_published()={result}")
+            time.sleep(0.1) # Don't spin if things go wrong
 
 #----------------------------------------------------------------
 # Convert messages into commands for the projector
@@ -259,14 +266,16 @@ def msg_to_cmds(msg_command, msg_payload):
             serialQ.put(b'\r*blank=on#\r')
         elif msg_payload == b'OFF':
             serialQ.put(b'\r*blank=off#\r')
-        serialQ.put(b'\r*blank=?#\r')
+        else:
+            serialQ.put(b'\r*blank=?#\r')
 
     elif msg_command == 'power':
         if msg_payload == b'ON':
             serialQ.put(b'\r*pow=on#\r')
         elif msg_payload == b'OFF':
             serialQ.put(b'\r*pow=off#\r')
-        serialQ.put(b'\r*pow=?#\r')
+        else:
+            serialQ.put(b'\r*pow=?#\r')
 
     elif msg_command == 'source':
         if msg_payload == b'HDMI' or msg_payload == b'HDMI1':
@@ -277,8 +286,8 @@ def msg_to_cmds(msg_command, msg_payload):
             serialQ.put(b'\r*sour=rgb#\r')
         elif msg_payload == b'USB':
             serialQ.put(b'\r*sour=usbreader#\r')
-        serialQ.put(b'\r*sour=?#\r')
-    return
+        else:
+            serialQ.put(b'\r*sour=?#\r')
 
 #----------------------------------------------------------------
 # Update the availability topic of the device
@@ -289,7 +298,6 @@ def publish_availability(available=True):
         mqtt_publish(topic=availability_topic, payload="Online", retain=False)
     else:
         mqtt_publish(topic=availability_topic, payload="Offline", retain=True)
-    return
 
 #----------------------------------------------------------------
 # Build and publish the configuration for related devices
@@ -325,7 +333,6 @@ def publish_switch_config():
     #print(json.dumps(power_switch_config, sort_keys=False, indent=2))
     mqtt_publish(topic=config_topic,
            payload=json.dumps(power_switch_config), retain=False)
-    return
 
 #----------------------------------------------------------------
 # Build and publish the configuration for related devices
@@ -358,11 +365,10 @@ def publish_select_config():
     #print(json.dumps(power_switch_config, sort_keys=False, indent=2))
     mqtt_publish(topic=config_topic,
            payload=json.dumps(source_select_config), retain=False)
-    return
 
 #----------------------------------------------------------------
 # Worker thread to periodically push initial commands onto the serial queue
-def worker():
+def timed_worker():
     while True:
         logging.info(f"worker awakens! Updating state information")
 
@@ -382,7 +388,6 @@ def worker():
 
         logging.info(f"worker updates queued. Sleeping for {config['worker']['delay']} secs")
         time.sleep(config['worker']['delay'])
-    return # Seems kinda silly, don't it?
 
 ################################################################
 # Launch the MQTT network client
@@ -419,7 +424,9 @@ serial_port = serial.Serial(config['serialPort']['name'], baudrate=config['seria
 time.sleep(1)
 
 # Start thread to periodically push initial commands onto the serial queue
-threading.Thread(target=worker, daemon=True).start()
+threading.Thread(target=timed_worker, daemon=True).start()
+threading.Thread(target=serialQ_worker, daemon=True).start()
+threading.Thread(target=publishQ_worker, daemon=True).start()
 
 # Start the event loop
 logging.info(f"Entering event loop for {config['serialPort']['name']}.  SIGINT to quit.")
@@ -429,6 +436,3 @@ while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
         parseSerialInput(input)
-    if not publishQ.empty() or not serialQ.empty():
-        processQueues()
-
