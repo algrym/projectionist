@@ -231,7 +231,7 @@ def serialq_worker():
     while True:
         # Block until there's an object on the queue
         msg = serialQ.get(block=True, timeout=queue_timeout)
-        logging.debug(f"serialQ worker: msg=\"{msg}\"")
+        logging.debug(f"serialQ worker: qsize={serialQ.qsize} msg=\"{msg}\"")
 
         # Push the object from the queue out the serial port
         try:
@@ -251,7 +251,7 @@ def publishq_worker():
     while True:
         # Block until there's an object on the queue
         topic, payload, retain = publishQ.get(block=True, timeout=queue_timeout)
-        logging.debug(f"publishQ worker: topic=\"{topic}\" payload=\"{payload}\" retain=\"{retain}\"")
+        logging.debug(f"publishQ worker: qsize={publishQ.qsize} topic=\"{topic}\" payload=\"{payload}\" retain=\"{retain}\"")
 
         # publish the object from the queue
         result = client.publish(topic, payload=payload, qos=0, retain=retain)
