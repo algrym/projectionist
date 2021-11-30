@@ -8,11 +8,6 @@ PRJ_PORT_BAUD=9600
 # * It only accepts "sour=hdmi" in lower case.
 # * It only accepts "sour=hdmi" despite calling it HDMI1
 # * It only accepts '\r', not '\r\n', or '\n'.
-# * It only supports these commands:
-# ** Power on/off/status
-# ** Source change
-# ** Model name
-# ** Blank on/off/status
 
 #   cs8:     8 data bits
 #   -parenb: No parity (because of the '-')
