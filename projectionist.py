@@ -43,7 +43,6 @@ client_is_connected = False
 
 ################################################################
 # Initial Setup
-logger.info("Projectionist v1.0 - Heading into the projection booth ... It's aliiiive!")
 
 #----------------------------------------------------------------
 # Parse CLI arguments
@@ -72,6 +71,8 @@ logger.setLevel(logLevel)
 # Send all logging messages to the journal
 logging.root.addHandler(systemd.journal.JournalHandler())
 logger.addHandler(systemd.journal.JournalHandler())
+
+logger.info("Projectionist v1.0 - Heading into the projection booth ... It's aliiiive!")
 
 #----------------------------------------------------------------
 # Initial setup of the inbound and outbound queues
@@ -354,11 +355,11 @@ def publish_switch_config():
         "command_topic": mqtt_topic + "/power/set",
         "payload_off": "OFF",
         "payload_on": "ON",
-        "value_template": "{{value_json.power}}",
         "availability_topic": mqtt_topic + "/LWT",
         "payload_available": "Online",
         "payload_not_available": "Offline",
         "unique_id": unique_id,
+        "icon": "mdi:projector",
         "device": {
             "via_device": platform.node(),
             "manufacturer": config['device']['manufacturer'],
@@ -371,7 +372,7 @@ def publish_switch_config():
 
 #----------------------------------------------------------------
 # Build and publish the configuration for related devices
-# - Source for /source
+# - Select for /source
 def publish_select_config():
     logger.info(f"Transmitting JSON to config select topic")
 
@@ -385,11 +386,41 @@ def publish_select_config():
         "state_topic": mqtt_topic + "/source",
         "command_topic": mqtt_topic + "/source/set",
         "options": ["HDMI", "HDMI2", "RGB", "USB"],
-        "value_template": "{{value_json.source}}",
         "availability_topic": mqtt_topic + "/LWT",
         "payload_available": "Online",
         "payload_not_available": "Offline",
         "unique_id": unique_id,
+        "icon": "mdi:video-input-hdmi",
+        "device": {
+            "via_device": platform.node(),
+            "manufacturer": config['device']['manufacturer'],
+            "model": config['device']['model'],
+            "identifiers": unique_id,
+        }
+    }
+    mqtt_publish(topic=config_topic,
+           payload=json.dumps(source_select_config), retain=True)
+
+#----------------------------------------------------------------
+# Build and publish the configuration for related devices
+# - Sensor for /lamphour
+def publish_sensor_config():
+    logger.info(f"Transmitting JSON to config sensor topic")
+
+    # <discovery_prefix>/<component>/<unique_id>/config
+    unique_id = config['mqtt']['topic']['unique_id'] + "_sensor"
+    config_topic = f"{config['mqtt']['discovery']['prefix']}/sensor/{unique_id}/config"
+
+    # Setting up source select
+    source_select_config= {
+        "name": config['mqtt']['topic']['name'] + ' hours lamp used',
+        "state_topic": mqtt_topic + "/lamphour",
+        "unit_of_measurement": "hours",
+        "availability_topic": mqtt_topic + "/LWT",
+        "payload_available": "Online",
+        "payload_not_available": "Offline",
+        "unique_id": unique_id,
+        "icon": "mdi:lightbulb",
         "device": {
             "via_device": platform.node(),
             "manufacturer": config['device']['manufacturer'],
@@ -417,6 +448,7 @@ def timed_worker():
         # Publish the config for the projector
         publish_switch_config()
         publish_select_config()
+        publish_sensor_config()
 
         # Publish availability
         publish_availability(True)
