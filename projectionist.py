@@ -367,7 +367,7 @@ def publish_switch_config():
             }
     }
     mqtt_publish(topic=config_topic,
-           payload=json.dumps(power_switch_config), retain=False)
+           payload=json.dumps(power_switch_config), retain=True)
 
 #----------------------------------------------------------------
 # Build and publish the configuration for related devices
@@ -397,9 +397,8 @@ def publish_select_config():
             "identifiers": unique_id,
         }
     }
-    #print(json.dumps(power_switch_config, sort_keys=False, indent=2))
     mqtt_publish(topic=config_topic,
-           payload=json.dumps(source_select_config), retain=False)
+           payload=json.dumps(source_select_config), retain=True)
 
 #----------------------------------------------------------------
 # Worker thread to periodically push initial commands onto the serial queue
