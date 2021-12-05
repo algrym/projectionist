@@ -7,7 +7,8 @@ Description=Projectionist MQTT-to-Serial projector control service
 [Service]
 
 # Command to execute when the service is started
-ExecStart=/usr/bin/python /usr/local/lib/python_demo_service/python_demo_service.py
+#ExecStart=/usr/bin/python /usr/local/lib/python_demo_service/python_demo_service.py
+ExecStart=%h/projectionist/projectionist.py -vf %h/projectionist/config-local.yaml
 
 # Disable Python's buffering of STDOUT and STDERR, so that output from the
 # service shows up immediately in systemd's logs
@@ -19,8 +20,8 @@ Restart=on-failure
 # Our service will notify systemd once it is up and running
 Type=notify
 
-# TODO: Use a dedicated user to run our service
-User=python_demo_service
+# If desired, a dedicated user to run our service
+#User=projectionist
 
 [Install]
 # Tell systemd to automatically start this service when the system boots
