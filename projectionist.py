@@ -236,19 +236,19 @@ def parse_serial_input(input):
 
     elif input.startswith('*LTIM='):
         logger.debug(f"serial found LTIM={input[6:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/lamphour", payload=input[6:-1])
+        mqtt_publish(topic=mqtt_topic + "/lamphour", payload=input[6:-1].upper())
 
     elif input.startswith('*POW='):
         logger.debug(f"serial found POW={input[5:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/power", payload=input[5:-1])
+        mqtt_publish(topic=mqtt_topic + "/power", payload=input[5:-1].upper())
 
     elif input.startswith('*SOUR='):
         logger.debug(f"serial found SOUR={input[6:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/source", payload=input[6:-1])
+        mqtt_publish(topic=mqtt_topic + "/source", payload=input[6:-1].upper())
 
     elif input.startswith('*BLANK='):
         logger.debug(f"serial found BLANK={input[7:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/blank", payload=input[7:-1])
+        mqtt_publish(topic=mqtt_topic + "/blank", payload=input[7:-1].upper())
 
     else:
         logger.debug(f"serial unknown \"{repr(input)}\"")
