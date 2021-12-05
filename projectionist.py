@@ -72,7 +72,7 @@ logger.setLevel(logLevel)
 logging.root.addHandler(systemd.journal.JournalHandler())
 logger.addHandler(systemd.journal.JournalHandler())
 
-logger.info("Projectionist v1.0 - Heading into the projection booth ... It's aliiiive!")
+logger.info("Projectionist v1.1 - Heading into the projection booth ... It's aliiiive!")
 
 #----------------------------------------------------------------
 # Initial setup of the inbound and outbound queues
