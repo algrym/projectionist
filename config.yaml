@@ -14,9 +14,10 @@ mqtt:
     prefix: homeassistant
   keepalive: 120
   useTLS: false
-serialPort:
+serial_port:
   name: /dev/ttyUSB0
   baud: 9600
+  timeout: 5
 worker:
   delay: 60
 device:

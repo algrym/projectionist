@@ -43,7 +43,7 @@ client_is_connected = False
 
 ################################################################
 # Initial Setup
-print("Projectionist v1.0 - Heading into the projection booth ... It's aliiiive!")
+logger.info("Projectionist v1.0 - Heading into the projection booth ... It's aliiiive!")
 
 #----------------------------------------------------------------
 # Parse CLI arguments
@@ -91,7 +91,7 @@ if config['mqtt']['topic']['node_id'] == 'HOSTNAME':
     config['mqtt']['topic']['node_id'] = platform.node()
 
 # topic: <prefix>/[<node_id>/]<object_id>
-mqtt_topic = f"{config['mqtt']['topic']['prefix']}/{config['mqtt']['topic']['node_id']}/{ config['mqtt']['topic']['object_id']}"
+mqtt_topic = f"{config['mqtt']['topic']['prefix']}/{config['mqtt']['topic']['node_id']}/{config['mqtt']['topic']['object_id']}"
 logger.debug(f"MQTT using topic base: {mqtt_topic}")
 
 # LWT := Last will and testament
@@ -366,7 +366,6 @@ def publish_switch_config():
             "identifiers": unique_id,
             }
     }
-    #print(json.dumps(power_switch_config, sort_keys=False, indent=2))
     mqtt_publish(topic=config_topic,
            payload=json.dumps(power_switch_config), retain=False)
 
@@ -453,7 +452,15 @@ client.loop_start()
 ################################################################
 # Connect to the serial device
 #  Needs 9600 8N1 with all flow control disabled
-serial_port = serial.Serial(config['serialPort']['name'], baudrate=config['serialPort']['baud'], bytesize=8, parity='N', stopbits=1, timeout=1.0, xonxoff=False, rtscts=False, dsrdtr=False)
+serial_port = serial.Serial(config['serial_port']['name'],
+        baudrate=config['serial_port']['baud'],
+        bytesize=8,
+        parity='N',
+        stopbits=1,
+        timeout=1.0,
+        xonxoff=False,
+        rtscts=False,
+        dsrdtr=False)
 
 ################################################################
 # wait briefly for the system to complete waking up
@@ -465,7 +472,7 @@ threading.Thread(target=serialq_worker, daemon=True).start()
 threading.Thread(target=publishq_worker, daemon=True).start()
 
 # Start the event loop
-logger.info(f"Entering event loop for {config['serialPort']['name']}")
+logger.info(f"Entering event loop for {config['serial_port']['name']}")
 
 # Tell systemd that our service is ready
 systemd.daemon.notify('READY=1')
@@ -473,4 +480,5 @@ systemd.daemon.notify('READY=1')
 while(True):
     input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
     if len(input) != 0:
+        systemd.daemon.notify('WATCHDOG=1')
         parse_serial_input(input)
