@@ -72,7 +72,7 @@ logger.setLevel(logLevel)
 logging.root.addHandler(systemd.journal.JournalHandler())
 logger.addHandler(systemd.journal.JournalHandler())
 
-logger.info("Projectionist v1.1 - Heading into the projection booth ... It's aliiiive!")
+logger.info("Projectionist v1.1.1 - Heading into the projection booth ... It's aliiiive!")
 
 #----------------------------------------------------------------
 # Initial setup of the inbound and outbound queues
@@ -385,7 +385,7 @@ def publish_select_config():
         "name": config['mqtt']['topic']['name'] + ' input source',
         "state_topic": mqtt_topic + "/source",
         "command_topic": mqtt_topic + "/source/set",
-        "options": ["HDMI", "HDMI2", "RGB", "USB"],
+        "options": ["HDMI1", "HDMI2", "RGB", "USB"],
         "availability_topic": mqtt_topic + "/LWT",
         "payload_available": "Online",
         "payload_not_available": "Offline",
