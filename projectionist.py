@@ -44,37 +44,44 @@ client_is_connected = False
 ################################################################
 # Initial Setup
 
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 # Parse CLI arguments
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--config-file', default='config.yaml',
-            help='load configuration from CONFIG_FILE')
-    parser.add_argument('-v', '--verbose', action='store_true',
-            help='output additional information')
+    parser.add_argument(
+        "-f",
+        "--config-file",
+        default="config.yaml",
+        help="load configuration from CONFIG_FILE",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="output additional information"
+    )
     args = parser.parse_args()
 
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 # Setup logger to systemd or STDOUT
 
 # get an instance of the logger object this module will use
-logger = logging.getLogger('projectionist')
-logger.propagate=False
+logger = logging.getLogger("projectionist")
+logger.propagate = False
 
 # how much output?
 if args.verbose:
-    logLevel=logging.DEBUG
+    logLevel = logging.DEBUG
 else:
-    logLevel=logging.WARNING
+    logLevel = logging.WARNING
 logger.setLevel(logLevel)
 
 # Send all logging messages to the journal
 logging.root.addHandler(systemd.journal.JournalHandler())
 logger.addHandler(systemd.journal.JournalHandler())
 
-logger.info("Projectionist v1.1.1 - Heading into the projection booth ... It's aliiiive!")
+logger.info(
+    "Projectionist v1.1.1 - Heading into the projection booth ... It's aliiiive!"
+)
 
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 # Initial setup of the inbound and outbound queues
 publishQ = queue.Queue()
 serialQ = queue.Queue()
@@ -84,12 +91,12 @@ serialQ = queue.Queue()
 with open(args.config_file) as f:
     config = yaml.safe_load(f)
 
-logger.info(f"Configuration loaded from \"{args.config_file}\": {config}")
+logger.info(f'Configuration loaded from "{args.config_file}": {config}')
 
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 # Setup composite config elements
-if config['mqtt']['topic']['node_id'] == 'HOSTNAME':
-    config['mqtt']['topic']['node_id'] = platform.node()
+if config["mqtt"]["topic"]["node_id"] == "HOSTNAME":
+    config["mqtt"]["topic"]["node_id"] = platform.node()
 
 # topic: <prefix>/[<node_id>/]<object_id>
 mqtt_topic = f"{config['mqtt']['topic']['prefix']}/{config['mqtt']['topic']['node_id']}/{config['mqtt']['topic']['object_id']}"
@@ -100,8 +107,10 @@ availability_topic = mqtt_topic + "/LWT"
 logger.debug(f"MQTT using availability topic: {availability_topic}")
 
 # Compute the queue wait timeout
-queue_timeout = int(1.1 * int(config['worker']['delay']))
-logger.debug(f"using {queue_timeout}s queue timeout at 110% of worker delay ({config['worker']['delay']})")
+queue_timeout = int(1.1 * int(config["worker"]["delay"]))
+logger.debug(
+    f"using {queue_timeout}s queue timeout at 110% of worker delay ({config['worker']['delay']})"
+)
 
 ################################################################
 # Attach a handler to the keyboard interrupt (control-C).
@@ -126,7 +135,8 @@ def _signal_handler(signal_number, stack_frame):
     logger.info("Exiting.  You don't have to go home, but you can't stay here.")
     sys.exit(0)
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Install SIGINT signal handler ASAP
 logger.debug("Installing signal handlers ...")
 
@@ -142,35 +152,47 @@ signal.signal(signal.SIGPIPE, _signal_handler)
 ################################################################
 # MQTT callbacks and setup
 
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 # The callback for when the broker responds to our connection request.
 def on_mqtt_connect(client, userdata, flags, rc):
     global client_is_connected
-    if rc==0:
-        logger.info(f"MQTT connect flags=\"{flags}\", result code={rc}")
+    if rc == 0:
+        logger.info(f'MQTT connect flags="{flags}", result code={rc}')
         client_is_connected = True
-    elif rc==1:
-        logger.error(f"MQTT connect refused: incorrect protocol version, flags={flags}, result code={rc}")
+    elif rc == 1:
+        logger.error(
+            f"MQTT connect refused: incorrect protocol version, flags={flags}, result code={rc}"
+        )
         client_is_connected = False
         return
-    elif rc==2:
-        logger.error(f"MQTT connect refused: invalid client identifier, flags={flags}, result code={rc}")
+    elif rc == 2:
+        logger.error(
+            f"MQTT connect refused: invalid client identifier, flags={flags}, result code={rc}"
+        )
         client_is_connected = False
         return
-    elif rc==3:
-        logger.error(f"MQTT connect refused: server unavailable, flags={flags}, result code={rc}")
+    elif rc == 3:
+        logger.error(
+            f"MQTT connect refused: server unavailable, flags={flags}, result code={rc}"
+        )
         client_is_connected = False
         return
-    elif rc==4:
-        logger.error(f"MQTT connect refused: bad username or password, flags={flags}, result code={rc}")
+    elif rc == 4:
+        logger.error(
+            f"MQTT connect refused: bad username or password, flags={flags}, result code={rc}"
+        )
         client_is_connected = False
         return
-    elif rc==5:
-        logger.error(f"MQTT connect refused: not authorized, flags={flags}, result code={rc}")
+    elif rc == 5:
+        logger.error(
+            f"MQTT connect refused: not authorized, flags={flags}, result code={rc}"
+        )
         client_is_connected = False
         return
     else:
-        logger.error(f"MQTT connect failed: unknown reason, flags={flags}, result code={rc}")
+        logger.error(
+            f"MQTT connect failed: unknown reason, flags={flags}, result code={rc}"
+        )
         client_is_connected = False
         return
 
@@ -187,7 +209,8 @@ def on_mqtt_connect(client, userdata, flags, rc):
     # Update mqtt availability topic on connect
     publish_availability(True)
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # The callback for when a message has been received on a topic to which this
 # client is subscribed.  The message variable is a MQTTMessage that describes
 # all of the message parameters.
@@ -198,90 +221,99 @@ def on_mqtt_connect(client, userdata, flags, rc):
 #   mid is an integer message ID.
 def on_mqtt_message(client, userdata, msg):
     if msg.topic.startswith(mqtt_topic):
-        msg_to_cmds(msg.topic.split('/')[3], msg.payload)
+        msg_to_cmds(msg.topic.split("/")[3], msg.payload)
     else:
-        logger.debug(f"mqtt msg unknown mid={msg.mid} topic=\"{msg.topic}\" payload=\"{msg.payload}\"")
+        logger.debug(
+            f'mqtt msg unknown mid={msg.mid} topic="{msg.topic}" payload="{msg.payload}"'
+        )
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # called when the client disconnects from the broker.
 def on_mqtt_disconnect(client, userdata, rc):
-    logger.debug(f"mqtt disconnect userdata=\"{userdata}\" rc={rc}")
+    logger.debug(f'mqtt disconnect userdata="{userdata}" rc={rc}')
     client_is_connected = False
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Handle the details of an mqtt publish
 #   If the publish fails, put the item on the publishQ
 def mqtt_publish(topic, payload, retain=False):
     publishQ.put((topic, payload, retain), block=True, timeout=queue_timeout)
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # This faux-callback gets called when there's incoming serial input
 def parse_serial_input(input):
     # Trim stuff from the beginning and end of the input
     input.strip()
 
     # Ignore input that's echo'd back from the projector
-    if input.startswith('>'):
+    if input.startswith(">"):
         logger.debug(f"serial echo back: {repr(input)}")
 
     # Handle weird power-on state message
-    elif input == '0.33PUN':
-        logger.debug(f"serial weird power-on state message: \"{repr(input)}\"")
-        serialQ.put(b'\r*pow=?#\r')
+    elif input == "0.33PUN":
+        logger.debug(f'serial weird power-on state message: "{repr(input)}"')
+        serialQ.put(b"\r*pow=?#\r")
 
     # Handle various known responses from the projector
-    elif input.startswith('*MODELNAME='):
+    elif input.startswith("*MODELNAME="):
         logger.debug(f"serial found MODELNAME={input[11:-1]}")
         mqtt_publish(topic=mqtt_topic + "/modelname", payload=input[11:-1])
 
-    elif input.startswith('*LTIM='):
+    elif input.startswith("*LTIM="):
         logger.debug(f"serial found LTIM={input[6:-1]}")
         mqtt_publish(topic=mqtt_topic + "/lamphour", payload=input[6:-1].upper())
 
-    elif input.startswith('*POW='):
+    elif input.startswith("*POW="):
         logger.debug(f"serial found POW={input[5:-1]}")
         mqtt_publish(topic=mqtt_topic + "/power", payload=input[5:-1].upper())
 
-    elif input.startswith('*SOUR='):
+    elif input.startswith("*SOUR="):
         logger.debug(f"serial found SOUR={input[6:-1]}")
         mqtt_publish(topic=mqtt_topic + "/source", payload=input[6:-1].upper())
 
-    elif input.startswith('*BLANK='):
+    elif input.startswith("*BLANK="):
         logger.debug(f"serial found BLANK={input[7:-1]}")
         mqtt_publish(topic=mqtt_topic + "/blank", payload=input[7:-1].upper())
 
     else:
-        logger.debug(f"serial unknown \"{repr(input)}\"")
+        logger.debug(f'serial unknown "{repr(input)}"')
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # This worker thread handles the outbound serial queue
 def serialq_worker():
     logger.debug(f"serialQ worker starting.")
     while True:
         # Block until there's an object on the queue
         msg = serialQ.get(block=True, timeout=queue_timeout)
-        logger.debug(f"serialQ worker: qsize={serialQ.qsize()} msg=\"{msg}\"")
+        logger.debug(f'serialQ worker: qsize={serialQ.qsize()} msg="{msg}"')
         systemd.daemon.notify("WATCHDOG=1")
 
         # Push the object from the queue out the serial port
         try:
             serial_port.write(msg)
         except Exception as e:
-            logger.error(f'serialQ port write error msg=\"{msg}\" error=\"{e}\"')
+            logger.error(f'serialQ port write error msg="{msg}" error="{e}"')
             sys.exit(os.EX_IOERR)
 
         # Let the queue know that we're successful
         serialQ.task_done()
-        time.sleep(0.1) # Pause to let the serial port settle
+        time.sleep(0.1)  # Pause to let the serial port settle
 
-#----------------------------------------------------------------
-# This worker thread handles the outbound serial queue
+
+# ----------------------------------------------------------------
+# This worker thread handles the outbound publish queue
 def publishq_worker():
     logger.debug(f"publishQ worker starting.")
     while True:
         # Block until there's an object on the queue
         topic, payload, retain = publishQ.get(block=True, timeout=queue_timeout)
-        logger.debug(f"publishQ worker: qsize={publishQ.qsize()} topic=\"{topic}\" payload=\"{payload}\" retain=\"{retain}\"")
+        logger.debug(
+            f'publishQ worker: qsize={publishQ.qsize()} topic="{topic}" payload="{payload}" retain="{retain}"'
+        )
         systemd.daemon.notify("WATCHDOG=1")
 
         # publish the object from the queue
@@ -291,52 +323,59 @@ def publishq_worker():
             logger.debug(f"publishQ worker success mid={result.mid}")
             publishQ.task_done()
         else:
-            logger.debug(f"publishQ worker failed mid={result.mid} rc={result.rc} result.is_published()={result.is_published()}")
-            time.sleep(0.1) # Don't spin if things go wrong
+            logger.debug(
+                f"publishQ worker failed mid={result.mid} rc={result.rc} result.is_published()={result.is_published()}"
+            )
+            time.sleep(0.1)  # Don't spin if things go wrong
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Convert messages into commands for the projector
 def msg_to_cmds(msg_command, msg_payload):
-    logger.debug(f"msg_to_cmds cmd=\"{msg_command}\" payload=\"{msg_payload}\"")
-    if msg_command == 'blank':
-        if msg_payload == b'ON':
-            serialQ.put(b'\r*blank=on#\r')
-        elif msg_payload == b'OFF':
-            serialQ.put(b'\r*blank=off#\r')
+    logger.debug(f'msg_to_cmds cmd="{msg_command}" payload="{msg_payload}"')
+    if msg_command == "blank":
+        if msg_payload == b"ON":
+            serialQ.put(b"\r*blank=on#\r")
+        elif msg_payload == b"OFF":
+            serialQ.put(b"\r*blank=off#\r")
         else:
-            serialQ.put(b'\r*blank=?#\r')
+            serialQ.put(b"\r*blank=?#\r")
 
-    elif msg_command == 'power':
-        if msg_payload == b'ON':
-            serialQ.put(b'\r*pow=on#\r')
-        elif msg_payload == b'OFF':
-            serialQ.put(b'\r*pow=off#\r')
+    elif msg_command == "power":
+        if msg_payload == b"ON":
+            serialQ.put(b"\r*pow=on#\r")
+        elif msg_payload == b"OFF":
+            serialQ.put(b"\r*pow=off#\r")
         else:
-            serialQ.put(b'\r*pow=?#\r')
+            serialQ.put(b"\r*pow=?#\r")
 
-    elif msg_command == 'source':
-        if msg_payload == b'HDMI' or msg_payload == b'HDMI1':
-            serialQ.put(b'\r*sour=hdmi#\r')
-        elif msg_payload == b'HDMI2':
-            serialQ.put(b'\r*sour=hdmi2#\r')
-        elif msg_payload == b'RGB':
-            serialQ.put(b'\r*sour=rgb#\r')
-        elif msg_payload == b'USB':
-            serialQ.put(b'\r*sour=usbreader#\r')
+    elif msg_command == "source":
+        if msg_payload == b"HDMI" or msg_payload == b"HDMI1":
+            serialQ.put(b"\r*sour=hdmi#\r")
+        elif msg_payload == b"HDMI2":
+            serialQ.put(b"\r*sour=hdmi2#\r")
+        elif msg_payload == b"RGB":
+            serialQ.put(b"\r*sour=rgb#\r")
+        elif msg_payload == b"USB":
+            serialQ.put(b"\r*sour=usbreader#\r")
         else:
-            serialQ.put(b'\r*sour=?#\r')
+            serialQ.put(b"\r*sour=?#\r")
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Update the availability topic of the device
 #   https://www.hivemq.com/blog/mqtt-essentials-part-9-last-will-and-testament/
 def publish_availability(available=True):
-    logger.debug(f"publish availability topic=\"{availability_topic}\" available={available}")
+    logger.debug(
+        f'publish availability topic="{availability_topic}" available={available}'
+    )
     if available:
         mqtt_publish(topic=availability_topic, payload="Online", retain=False)
     else:
         mqtt_publish(topic=availability_topic, payload="Offline", retain=True)
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Build and publish the configuration for related devices
 # - Switch for /power
 def publish_switch_config():
@@ -345,12 +384,12 @@ def publish_switch_config():
     # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
     # Best practice for entities with a unique_id is to set <object_id> to unique_id and omit the <node_id>, so ...
     # <discovery_prefix>/<component>/<unique_id>/config
-    unique_id = config['mqtt']['topic']['unique_id'] + "_power"
+    unique_id = config["mqtt"]["topic"]["unique_id"] + "_power"
     config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{unique_id}/config"
 
     # Setting up power
     power_switch_config = {
-        "name": config['mqtt']['topic']['name'] + ' power',
+        "name": config["mqtt"]["topic"]["name"] + " power",
         "state_topic": mqtt_topic + "/power",
         "command_topic": mqtt_topic + "/power/set",
         "payload_off": "OFF",
@@ -362,27 +401,29 @@ def publish_switch_config():
         "icon": "mdi:projector",
         "device": {
             "via_device": platform.node(),
-            "manufacturer": config['device']['manufacturer'],
-            "model": config['device']['model'],
+            "manufacturer": config["device"]["manufacturer"],
+            "model": config["device"]["model"],
             "identifiers": unique_id,
-            }
+        },
     }
-    mqtt_publish(topic=config_topic,
-           payload=json.dumps(power_switch_config), retain=True)
+    mqtt_publish(
+        topic=config_topic, payload=json.dumps(power_switch_config), retain=True
+    )
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Build and publish the configuration for related devices
 # - Select for /source
 def publish_select_config():
     logger.info(f"Transmitting JSON to config select topic")
 
     # <discovery_prefix>/<component>/<unique_id>/config
-    unique_id = config['mqtt']['topic']['unique_id'] + "_source"
+    unique_id = config["mqtt"]["topic"]["unique_id"] + "_source"
     config_topic = f"{config['mqtt']['discovery']['prefix']}/select/{unique_id}/config"
 
     # Setting up source select
-    source_select_config= {
-        "name": config['mqtt']['topic']['name'] + ' input source',
+    source_select_config = {
+        "name": config["mqtt"]["topic"]["name"] + " input source",
         "state_topic": mqtt_topic + "/source",
         "command_topic": mqtt_topic + "/source/set",
         "options": ["HDMI1", "HDMI2", "RGB", "USB"],
@@ -393,27 +434,29 @@ def publish_select_config():
         "icon": "mdi:video-input-hdmi",
         "device": {
             "via_device": platform.node(),
-            "manufacturer": config['device']['manufacturer'],
-            "model": config['device']['model'],
+            "manufacturer": config["device"]["manufacturer"],
+            "model": config["device"]["model"],
             "identifiers": unique_id,
-        }
+        },
     }
-    mqtt_publish(topic=config_topic,
-           payload=json.dumps(source_select_config), retain=True)
+    mqtt_publish(
+        topic=config_topic, payload=json.dumps(source_select_config), retain=True
+    )
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Build and publish the configuration for related devices
 # - Sensor for /lamphour
 def publish_sensor_config():
     logger.info(f"Transmitting JSON to config sensor topic")
 
     # <discovery_prefix>/<component>/<unique_id>/config
-    unique_id = config['mqtt']['topic']['unique_id'] + "_sensor"
+    unique_id = config["mqtt"]["topic"]["unique_id"] + "_sensor"
     config_topic = f"{config['mqtt']['discovery']['prefix']}/sensor/{unique_id}/config"
 
     # Setting up source select
-    source_select_config= {
-        "name": config['mqtt']['topic']['name'] + ' hours lamp used',
+    source_select_config = {
+        "name": config["mqtt"]["topic"]["name"] + " hours lamp used",
         "state_topic": mqtt_topic + "/lamphour",
         "unit_of_measurement": "hours",
         "availability_topic": mqtt_topic + "/LWT",
@@ -423,15 +466,17 @@ def publish_sensor_config():
         "icon": "mdi:lightbulb",
         "device": {
             "via_device": platform.node(),
-            "manufacturer": config['device']['manufacturer'],
-            "model": config['device']['model'],
+            "manufacturer": config["device"]["manufacturer"],
+            "model": config["device"]["model"],
             "identifiers": unique_id,
-        }
+        },
     }
-    mqtt_publish(topic=config_topic,
-           payload=json.dumps(source_select_config), retain=True)
+    mqtt_publish(
+        topic=config_topic, payload=json.dumps(source_select_config), retain=True
+    )
 
-#----------------------------------------------------------------
+
+# ----------------------------------------------------------------
 # Worker thread to periodically push initial commands onto the serial queue
 def timed_worker():
     while True:
@@ -439,11 +484,11 @@ def timed_worker():
         systemd.daemon.notify("WATCHDOG=1")
 
         # Poke the projector into updating its current state
-        serialQ.put(b'\r*modelname=?#\r')
-        serialQ.put(b'\r*ltim=?#\r')
-        serialQ.put(b'\r*pow=?#\r')
-        serialQ.put(b'\r*sour=?#\r')
-        serialQ.put(b'\r*blank=?#\r')
+        serialQ.put(b"\r*modelname=?#\r")
+        serialQ.put(b"\r*ltim=?#\r")
+        serialQ.put(b"\r*pow=?#\r")
+        serialQ.put(b"\r*sour=?#\r")
+        serialQ.put(b"\r*blank=?#\r")
 
         # Publish the config for the projector
         publish_switch_config()
@@ -453,8 +498,11 @@ def timed_worker():
         # Publish availability
         publish_availability(True)
 
-        logger.info(f"worker updates queued. Sleeping for {config['worker']['delay']} secs")
-        time.sleep(config['worker']['delay'])
+        logger.info(
+            f"worker updates queued. Sleeping for {config['worker']['delay']} secs"
+        )
+        time.sleep(config["worker"]["delay"])
+
 
 ################################################################
 # Launch the MQTT network client
@@ -467,31 +515,36 @@ client.on_connect = on_mqtt_connect
 client.on_message = on_mqtt_message
 client.on_disconnect = on_mqtt_disconnect
 
-if config['mqtt']['useTLS']:
+if config["mqtt"]["useTLS"]:
     logger.debug("Enabling TLS for MQTT")
     client.tls_set()
 
-client.username_pw_set(config['mqtt']['username'], config['mqtt']['password'])
+client.username_pw_set(config["mqtt"]["username"], config["mqtt"]["password"])
 
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 # Start a background thread to connect to the MQTT network.
 logger.debug("Starting background thread for MQTT connection")
-client.connect_async(config['mqtt']['hostname'], port=config['mqtt']['portnumber'],
-        keepalive=config['mqtt']['keepalive'])
+client.connect_async(
+    config["mqtt"]["hostname"],
+    port=config["mqtt"]["portnumber"],
+    keepalive=config["mqtt"]["keepalive"],
+)
 client.loop_start()
 
 ################################################################
 # Connect to the serial device
 #  Needs 9600 8N1 with all flow control disabled
-serial_port = serial.Serial(config['serial_port']['name'],
-        baudrate=config['serial_port']['baud'],
-        bytesize=8,
-        parity='N',
-        stopbits=1,
-        timeout=1.0,
-        xonxoff=False,
-        rtscts=False,
-        dsrdtr=False)
+serial_port = serial.Serial(
+    config["serial_port"]["name"],
+    baudrate=config["serial_port"]["baud"],
+    bytesize=8,
+    parity="N",
+    stopbits=1,
+    timeout=1.0,
+    xonxoff=False,
+    rtscts=False,
+    dsrdtr=False,
+)
 
 ################################################################
 # wait briefly for the system to complete waking up
@@ -506,10 +559,10 @@ threading.Thread(target=publishq_worker, daemon=True).start()
 logger.info(f"Entering event loop for {config['serial_port']['name']}")
 
 # Tell systemd that our service is ready
-systemd.daemon.notify('READY=1')
+systemd.daemon.notify("READY=1")
 
-while(True):
-    input = serial_port.readline().decode(encoding='ascii', errors='ignore').rstrip()
+while True:
+    input = serial_port.readline().decode(encoding="ascii", errors="ignore").rstrip()
     if len(input) != 0:
-        systemd.daemon.notify('WATCHDOG=1')
+        systemd.daemon.notify("WATCHDOG=1")
         parse_serial_input(input)
