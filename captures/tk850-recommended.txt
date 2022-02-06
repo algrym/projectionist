@@ -1,0 +1,38 @@
+# Recommended Settings for TK850 SDR & HDR
+# From the awesome: (transcription errors mine)
+#   https://hometheaterhifi.com/reviews/video-display/projectors/benq-tk850-ultra-hd-dlp-projector-review/
+#
+Mode Cinema
+Brightness 50
+Contrast 43
+Color/Tint 50
+Sharpness 6
+Gamma 2.3
+CT Normal
+Red gain 98
+Green gain 106
+Blue gain 101
+Red offset 252
+Green offset 260
+Blue offset 262
+CMS H S G
+R 230 200 230
+G 240 200 207
+B 212 200 212
+C 136 196 229
+M 312 196 276
+Y 266 185 220
+Brilliant Color 1/10
+Dynamic Iris High
+Light Mode Economic
+HDR
+HDR Brightness -1
+Red gain 100
+Green gain 100
+Blue gain 96
+Red offset 256
+Green offset 256
+Blue offset 256
+Brilliant Color 10
+Dynamic Iris High
+Light Mode Normal
