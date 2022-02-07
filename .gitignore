@@ -132,7 +132,10 @@ dmypy.json
 config-local.yaml
 
 # ignore vim swap files
-*.swp
+.swp
 
 # ignore log files
 projectionist.out
+
+# ignore Mac Desktop Services Store
+.DS_Store
