@@ -1,11 +1,10 @@
----
 mqtt:
   hostname: test.mosquitto.org
   portnumber: 1883
   username: projuser
   password: NOPENOPENOPE
   topic:
-    name: "Sample Projector"
+    name: Sample Projector
     prefix: projectionist
     node_id: HOSTNAME
     object_id: tk850
@@ -23,45 +22,44 @@ worker:
 device:
   manufacturer: BENQ
   model: TK850
-  suggested_area: "Sample Room"
+  suggested_area: Sample Room
   calibration:
-    - "bri=50"
-    - "con=43"
-    - "color=50"
-    - "tint=50"
-    - "sharp=6"
-    - "gamma=2.3"
-    - "ct=normal"
-    - "RGain=98"
-    - "GGain=106"
-    - "BGain=101"
-    - "ROffset=252"
-    - "GOffset=260"
-    - "BOffset=262"
-    - "diris=on"
-    - "lampm=seco"
-    - "primcr=red"
-    - "hue=230"
-    - "saturation=200"
-    - "gain=230"
-    - "primcr=green"
-    - "hue=240"
-    - "saturation=200"
-    - "gain=207"
-    - "primcr=blue"
-    - "hue=212"
-    - "saturation=200"
-    - "gain=212"
-    - "primcr=cyan"
-    - "hue=136"
-    - "saturation=196"
-    - "gain=229"
-    - "primcr=magenta"
-    - "hue=312"
-    - "saturation=196"
-    - "gain=276"
-    - "primcr=yellow"
-    - "hue=266"
-    - "saturation=185"
-    - "gain=220"
-
+    - bri=50
+    - con=43
+    - color=50
+    - tint=50
+    - sharp=6
+    - gamma=2.3
+    - ct=normal
+    - RGain=98
+    - GGain=106
+    - BGain=101
+    - ROffset=252
+    - GOffset=260
+    - BOffset=262
+    - diris=on
+    - lampm=seco
+    - primcr=red
+    - hue=230
+    - saturation=200
+    - gain=230
+    - primcr=green
+    - hue=240
+    - saturation=200
+    - gain=207
+    - primcr=blue
+    - hue=212
+    - saturation=200
+    - gain=212
+    - primcr=cyan
+    - hue=136
+    - saturation=196
+    - gain=229
+    - primcr=magenta
+    - hue=312
+    - saturation=196
+    - gain=276
+    - primcr=yellow
+    - hue=266
+    - saturation=185
+    - gain=220
