@@ -2,15 +2,13 @@
 
 import argparse
 
+VERSION = '0.1.0'
+
 
 def parse_cli_arguments():
     """ Parse command-line arguments """
+
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "dump",
-        action="store_true",
-        help="dump projector config"
-    )
     parser.add_argument(
         "-s",
         "--serial_port",
@@ -22,7 +20,24 @@ def parse_cli_arguments():
         "-v", "--verbose", action="store_true",
         help="output additional information"
     )
-    return parser.parse_args()
+    parser.add_argument(  # Ideally, this should be a sub_parser
+        "command",
+        nargs="?",
+        choices=['dump', 'version', 'help'],
+        help="command to execute"
+    )
+
+    args = parser.parse_args()
+
+    # Handle some quick-exit situations
+    if (not args.command or args.command == 'help'):
+        parser.print_help()
+        exit(0)
+    elif (args.command == 'version'):
+        print(VERSION)
+        exit(0)
+
+    return args
 
 
 def main():
