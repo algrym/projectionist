@@ -7,8 +7,15 @@
 
 ################################################################
 # Import libraries - we're _assuming_ POSIX
-import sys, time, signal, platform, logging, argparse, queue
+import sys
+import time
+import signal
+import platform
+import logging
+import argparse
+import queue
 import threading
+import os
 
 # Paho MQTT client to interface with Home Asssitant.
 #   https://www.eclipse.org/paho/clients/python/docs/
@@ -55,7 +62,8 @@ if __name__ == "__main__":
         help="load configuration from CONFIG_FILE",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", help="output additional information"
+        "-v", "--verbose", action="store_true",
+        help="output additional information"
     )
     args = parser.parse_args()
 
@@ -78,7 +86,7 @@ logging.root.addHandler(systemd.journal.JournalHandler())
 logger.addHandler(systemd.journal.JournalHandler())
 
 logger.info(
-    "Projectionist v1.1.1 - Heading into the projection booth ... It's aliiiive!"
+    "Projectionist v1.1.2 - Heading into the booth ... It's aliiive!"
 )
 
 # ----------------------------------------------------------------
@@ -114,8 +122,11 @@ logger.debug(
 
 ################################################################
 # Attach a handler to the keyboard interrupt (control-C).
+
+
 def _signal_handler(signal_number, stack_frame):
-    logger.info(f"Signal {signal.Signals(signal_number).name} caught, closing down ...")
+    logger.info(
+        f"Signal {signal.Signals(signal_number).name} caught, closing down ...")
     systemd.daemon.notify("STOPPING=1")
 
     signal.signal(signal.SIGINT, original_sigint_handler)
@@ -154,6 +165,8 @@ signal.signal(signal.SIGPIPE, _signal_handler)
 
 # ----------------------------------------------------------------
 # The callback for when the broker responds to our connection request.
+
+
 def on_mqtt_connect(client, userdata, flags, rc):
     global client_is_connected
     if rc == 0:
@@ -232,7 +245,6 @@ def on_mqtt_message(client, userdata, msg):
 # called when the client disconnects from the broker.
 def on_mqtt_disconnect(client, userdata, rc):
     logger.debug(f'mqtt disconnect userdata="{userdata}" rc={rc}')
-    client_is_connected = False
 
 
 # ----------------------------------------------------------------
@@ -264,7 +276,8 @@ def parse_serial_input(input):
 
     elif input.startswith("*LTIM="):
         logger.debug(f"serial found LTIM={input[6:-1]}")
-        mqtt_publish(topic=mqtt_topic + "/lamphour", payload=input[6:-1].upper())
+        mqtt_publish(topic=mqtt_topic + "/lamphour",
+                     payload=input[6:-1].upper())
 
     elif input.startswith("*POW="):
         logger.debug(f"serial found POW={input[5:-1]}")
@@ -285,7 +298,7 @@ def parse_serial_input(input):
 # ----------------------------------------------------------------
 # This worker thread handles the outbound serial queue
 def serialq_worker():
-    logger.debug(f"serialQ worker starting.")
+    logger.debug("serialQ worker starting.")
     while True:
         # Block until there's an object on the queue
         msg = serialQ.get(block=True, timeout=queue_timeout)
@@ -307,10 +320,11 @@ def serialq_worker():
 # ----------------------------------------------------------------
 # This worker thread handles the outbound publish queue
 def publishq_worker():
-    logger.debug(f"publishQ worker starting.")
+    logger.debug("publishQ worker starting.")
     while True:
         # Block until there's an object on the queue
-        topic, payload, retain = publishQ.get(block=True, timeout=queue_timeout)
+        topic, payload, retain = publishQ.get(
+            block=True, timeout=queue_timeout)
         logger.debug(
             f'publishQ worker: qsize={publishQ.qsize()} topic="{topic}" payload="{payload}" retain="{retain}"'
         )
@@ -379,10 +393,11 @@ def publish_availability(available=True):
 # Build and publish the configuration for related devices
 # - Switch for /power
 def publish_switch_config():
-    logger.info(f"Transmitting JSON to config switch topic")
+    logger.info("Transmitting JSON to config switch topic")
 
     # <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
-    # Best practice for entities with a unique_id is to set <object_id> to unique_id and omit the <node_id>, so ...
+    # Best practice for entities with a unique_id is to set <object_id>
+    # to unique_id and omit the <node_id>, so ...
     # <discovery_prefix>/<component>/<unique_id>/config
     unique_id = config["mqtt"]["topic"]["unique_id"] + "_power"
     config_topic = f"{config['mqtt']['discovery']['prefix']}/switch/{unique_id}/config"
@@ -407,7 +422,9 @@ def publish_switch_config():
         },
     }
     mqtt_publish(
-        topic=config_topic, payload=json.dumps(power_switch_config), retain=True
+        topic=config_topic,
+        payload=json.dumps(power_switch_config),
+        retain=True
     )
 
 
@@ -415,7 +432,7 @@ def publish_switch_config():
 # Build and publish the configuration for related devices
 # - Select for /source
 def publish_select_config():
-    logger.info(f"Transmitting JSON to config select topic")
+    logger.info("Transmitting JSON to config select topic")
 
     # <discovery_prefix>/<component>/<unique_id>/config
     unique_id = config["mqtt"]["topic"]["unique_id"] + "_source"
@@ -448,7 +465,7 @@ def publish_select_config():
 # Build and publish the configuration for related devices
 # - Sensor for /lamphour
 def publish_sensor_config():
-    logger.info(f"Transmitting JSON to config sensor topic")
+    logger.info("Transmitting JSON to config sensor topic")
 
     # <discovery_prefix>/<component>/<unique_id>/config
     unique_id = config["mqtt"]["topic"]["unique_id"] + "_sensor"
@@ -480,7 +497,7 @@ def publish_sensor_config():
 # Worker thread to periodically push initial commands onto the serial queue
 def timed_worker():
     while True:
-        logger.info(f"timed_worker awakens!")
+        logger.info("timed_worker awakens!")
         systemd.daemon.notify("WATCHDOG=1")
 
         # Poke the projector into updating its current state
