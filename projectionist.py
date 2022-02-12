@@ -244,7 +244,9 @@ def on_mqtt_message(client, userdata, msg):
 # ----------------------------------------------------------------
 # called when the client disconnects from the broker.
 def on_mqtt_disconnect(client, userdata, rc):
+    global client_is_connected
     logger.debug(f'mqtt disconnect userdata="{userdata}" rc={rc}')
+    client_is_connected = False
 
 
 # ----------------------------------------------------------------
